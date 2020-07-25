@@ -1,0 +1,265 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`IntroScreen renders correctly 1`] = `
+<RCTSafeAreaView
+  emulateUnlessSupported={true}
+  style={
+    Object {
+      "backgroundColor": "#FFF",
+      "flex": 1,
+    }
+  }
+>
+  <View
+    style={
+      Object {
+        "backgroundColor": "#FFF",
+        "marginTop": 10,
+        "paddingHorizontal": 26,
+      }
+    }
+  >
+    <View
+      style={
+        Object {
+          "flexDirection": "row",
+        }
+      }
+    >
+      <Image
+        source={
+          Object {
+            "uri": "https://reactnative.dev/img/tiny_logo.png",
+          }
+        }
+        style={
+          Object {
+            "height": 30,
+            "width": 30,
+          }
+        }
+      />
+      <Text
+        style={
+          Array [
+            Object {
+              "fontSize": 20,
+              "fontWeight": "500",
+              "marginLeft": 10,
+              "marginTop": 3,
+            },
+            Object {
+              "color": "#444",
+              "fontFamily": "System",
+            },
+          ]
+        }
+      >
+        GI Foody
+      </Text>
+    </View>
+    <View
+      style={
+        Object {
+          "backgroundColor": "#FFF",
+          "marginTop": 70,
+        }
+      }
+    >
+      <View>
+        <Text
+          style={
+            Array [
+              Object {
+                "fontSize": 48,
+                "fontWeight": "600",
+              },
+              Object {
+                "color": "#444",
+                "fontFamily": "System",
+              },
+            ]
+          }
+        >
+          Find correlation between meals and symptoms
+        </Text>
+      </View>
+      <View
+        style={
+          Object {
+            "marginTop": 32,
+          }
+        }
+      >
+        <Text
+          style={
+            Array [
+              Object {
+                "fontSize": 20,
+              },
+              Object {
+                "color": "#444",
+                "fontFamily": "System",
+              },
+            ]
+          }
+        >
+          Take a pic of your meal. Record Symptoms. Discover patterns.
+        </Text>
+      </View>
+      <View
+        style={
+          Object {
+            "marginTop": 80,
+          }
+        }
+      >
+        <View
+          accessible={true}
+          focusable={true}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            Object {
+              "alignItems": "center",
+              "backgroundColor": "#4287f5",
+              "borderRadius": 15,
+              "padding": 13,
+            }
+          }
+        >
+          <Text
+            style={
+              Array [
+                Object {
+                  "color": "#444",
+                  "fontFamily": "System",
+                },
+                Object {
+                  "color": "#FFF",
+                  "fontSize": 20,
+                  "fontWeight": "600",
+                },
+              ]
+            }
+          >
+            Sign up
+          </Text>
+        </View>
+      </View>
+      <View
+        style={
+          Array [
+            Object {
+              "flexDirection": "row",
+            },
+            Object {
+              "justifyContent": "center",
+              "marginTop": 40,
+            },
+          ]
+        }
+      >
+        <View
+          accessible={true}
+          focusable={false}
+          onClick={[Function]}
+          onResponderGrant={[Function]}
+          onResponderMove={[Function]}
+          onResponderRelease={[Function]}
+          onResponderTerminate={[Function]}
+          onResponderTerminationRequest={[Function]}
+          onStartShouldSetResponder={[Function]}
+          style={
+            Object {
+              "backgroundColor": "#FFF",
+              "flexDirection": "row",
+              "opacity": 1,
+              "paddingLeft": 7,
+              "paddingRight": 7,
+            }
+          }
+        >
+          <Text
+            style={
+              Array [
+                Object {
+                  "color": "#444",
+                  "fontFamily": "System",
+                },
+                Object {
+                  "fontSize": 17,
+                },
+              ]
+            }
+          >
+            Already have an account?
+          </Text>
+          <Text
+            style={
+              Array [
+                Object {
+                  "color": "#444",
+                  "fontFamily": "System",
+                },
+                Object {
+                  "color": "#f5a142",
+                  "fontSize": 17,
+                  "fontWeight": "700",
+                  "marginLeft": 5,
+                },
+              ]
+            }
+          >
+            Login
+          </Text>
+        </View>
+      </View>
+      <View
+        accessible={true}
+        focusable={false}
+        onClick={[Function]}
+        onResponderGrant={[Function]}
+        onResponderMove={[Function]}
+        onResponderRelease={[Function]}
+        onResponderTerminate={[Function]}
+        onResponderTerminationRequest={[Function]}
+        onStartShouldSetResponder={[Function]}
+        style={
+          Object {
+            "alignItems": "center",
+            "backgroundColor": "#FFF",
+            "marginTop": 30,
+            "opacity": 1,
+            "paddingLeft": 7,
+            "paddingRight": 7,
+          }
+        }
+      >
+        <Text
+          style={
+            Array [
+              Object {
+                "color": "#444",
+                "fontFamily": "System",
+              },
+              Object {
+                "color": "#919191",
+                "fontSize": 15,
+                "textDecorationLine": "underline",
+              },
+            ]
+          }
+        >
+          Skip for now
+        </Text>
+      </View>
+    </View>
+  </View>
+</RCTSafeAreaView>
+`;

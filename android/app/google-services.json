@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "84701038985",
+    "firebase_url": "https://the-gi-foody.firebaseio.com",
+    "project_id": "the-gi-foody",
+    "storage_bucket": "the-gi-foody.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:84701038985:android:9b98dd7fc70e4713e07958",
+        "android_client_info": {
+          "package_name": "com.eating_journal"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "84701038985-afig9p1c3646vs1pb1r8qshnjsm2t25m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eating_journal",
+            "certificate_hash": "6caeba7105d6c214a1c7c2a97dce409c77bdf1b4"
+          }
+        },
+        {
+          "client_id": "84701038985-he35bne8hbh5jdcgfn99fpbuolrvqf4l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAS266Fe1l_3Vo9F9SO_55prLG4iqrBvvM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "84701038985-he35bne8hbh5jdcgfn99fpbuolrvqf4l.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
