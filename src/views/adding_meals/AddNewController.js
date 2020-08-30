@@ -36,7 +36,12 @@ export const CameraModalScreen = (props) => {
         isVisible={isCameraVisible}
         onBackdropPress={() => setIsCameraVisible(false)}
         style={styles.modalDefault}>
-        <AddNewHome closeModal={closeCameraModal} reminders={props.reminders} />
+        <AddNewHome
+          closeModal={closeCameraModal}
+          reminders={props.reminders}
+          combineMeals={props.combineMeals}
+          symptoms={props.symptoms}
+        />
       </Modal>
     </View>
   );

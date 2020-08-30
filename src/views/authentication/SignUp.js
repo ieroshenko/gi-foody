@@ -4,6 +4,12 @@ import {LoginManager, AccessToken} from 'react-native-fbsdk';
 import auth, {firebase} from '@react-native-firebase/auth';
 import Modal from 'react-native-modal';
 import firestore from '@react-native-firebase/firestore';
+import {addReminderToDB} from '../../wrappers/firestore/RemindersDBManagement';
+import appleAuth, {
+  AppleAuthRequestScope,
+  AppleAuthRequestOperation,
+  AppleButton,
+} from '@invertase/react-native-apple-authentication';
 import {
   View,
   StyleSheet,
@@ -11,9 +17,9 @@ import {
   TextInput,
   TouchableHighlight,
   ScrollView,
-  Alert,
-  Dimensions,
   ActivityIndicator,
+  Platform,
+  TouchableOpacity,
 } from 'react-native';
 
 export const sendEmailVerification = () => {
@@ -22,6 +28,11 @@ export const sendEmailVerification = () => {
     .sendEmailVerification()
     .then(() => console.log('Sent the email verification'))
     .catch((e) => console.log(e.toString()));
+};
+
+// add a default reminder (30 minutes after meal)
+export const initReminders = (userID) => {
+  addReminderToDB(true, 'How do you feel?', '0:30', 'after', userID, []);
 };
 
 export const initSymptoms = async (userID) => {
@@ -36,12 +47,21 @@ export const initSymptoms = async (userID) => {
     });
 };
 
-const createNewDBUser = async (user) => {
-  let initData = {
-    mealNum: 0,
-  };
-  await firestore().collection('users').doc(user.uid).set(initData);
-  initSymptoms(user.uid);
+export const createNewDBUser = async (user) => {
+  // check if user was already initialized before
+  let userRef = firestore().collection('users').doc(user.uid);
+  let querySnapshot = await userRef.get();
+  // if not, initialize
+  if (!querySnapshot.exists) {
+    let initData = {
+      mealNum: 0,
+      combineMeals: 30,
+      accType: 'FREE',
+    };
+    await userRef.set(initData);
+    initReminders(user.uid);
+    initSymptoms(user.uid);
+  }
 };
 
 const SignUpScreen = (props) => {
@@ -50,6 +70,43 @@ const SignUpScreen = (props) => {
   const [error, setError] = useState('');
   const [isValid, setValid] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const onAppleBtnPress = async () => {
+    try {
+      // Start the sign-in request
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: AppleAuthRequestOperation.LOGIN,
+        requestedScopes: [
+          AppleAuthRequestScope.EMAIL,
+          AppleAuthRequestScope.FULL_NAME,
+        ],
+      });
+
+      // Ensure Apple returned a user identityToken
+      if (!appleAuthRequestResponse.identityToken) {
+        throw 'Apple Sign-In failed - no identify token returned';
+      }
+
+      // Create a Firebase credential from the response
+      const {identityToken, nonce} = appleAuthRequestResponse;
+      const appleCredential = firebase.auth.AppleAuthProvider.credential(
+        identityToken,
+        nonce,
+      );
+
+      // Sign-in the user with the credential
+      let response = await firebase
+        .auth()
+        .signInWithCredential(appleCredential);
+      if (response && response.user) {
+        await createNewDBUser(response.user);
+        setModalVisible(false);
+      }
+    } catch (e) {
+      setError(e.message);
+      setModalVisible(false);
+    }
+  };
 
   const facebookSignUp = async () => {
     try {
@@ -83,10 +140,9 @@ const SignUpScreen = (props) => {
       if (response && response.user) {
         await createNewDBUser(response.user);
         setModalVisible(false);
-        Alert.alert('Yep', 'Signed Up/In!');
       }
     } catch (e) {
-      setError(e);
+      setError(e.message);
       setModalVisible(false);
     }
   };
@@ -182,21 +238,27 @@ const SignUpScreen = (props) => {
             style={styles.signInValidButtonStyle}
             onPress={doSignUp}
             underlayColor={blue}>
-            <Text style={styles.getStartedTextStyle}>GET STARTED</Text>
+            <Text style={styles.getStartedTextStyle}>Get Started</Text>
           </TouchableHighlight>
           <Text style={styles.textOr}>OR</Text>
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleButtonContainer}>
+              <AppleButton
+                buttonType={AppleButton.Type.SIGN_UP}
+                buttonStyle={AppleButton.Style.BLACK}
+                style={styles.appleButton}
+                onPress={onAppleBtnPress}
+              />
+            </View>
+          )}
           <TouchableHighlight
             style={styles.facebookButtonStyle}
             onPress={facebookSignUp}
             underlayColor={blue}>
             <Text style={styles.getStartedTextStyle}>
-              SIGN UP WITH FACEBOOK
+              Sign up with Facebook
             </Text>
           </TouchableHighlight>
-          <Text style={styles.privacyPolicyText}>
-            By continuing, you agree to GI-Foody's Terms & Conditions and
-            Privacy Policy
-          </Text>
         </View>
         <Modal
           backdropOpacity={0.5} //TODO: update it later
@@ -274,7 +336,7 @@ const styles = StyleSheet.create({
     height: 300,
   },
   signInValidButtonStyle: {
-    flex: 0.3,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#2AE03E',
     width: '90%',
@@ -283,16 +345,30 @@ const styles = StyleSheet.create({
   },
   getStartedTextStyle: {
     color: 'white',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '500',
   },
   facebookButtonStyle: {
-    flex: 0.3,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#3b5998',
     width: '90%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  appleButton: {
+    height: 55,
+    width: '100%',
+  },
+  appleButtonContainer: {
+    height: 70,
+    width: '90%',
+    overflow: 'hidden',
+    borderRadius: 30,
+    marginBottom: 10,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textOr: {marginTop: 10, marginBottom: 10},
   privacyPolicyText: {

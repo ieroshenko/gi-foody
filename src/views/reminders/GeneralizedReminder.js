@@ -9,10 +9,13 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as ReminderFirestore from '../../../wrappers/RemindersDBManagement';
-import UserContext from '../../../hooks/UserContext';
+import * as ReminderFirestore from '../../wrappers/firestore/RemindersDBManagement';
+import UserContext from '../../hooks/UserContext';
+import PushNotification from 'react-native-push-notification';
+import {deactivateAllReminders} from '../../services/LocalPushController';
 
 const GeneralizedReminder = (props) => {
   const userID = React.useContext(UserContext);
@@ -46,45 +49,67 @@ const GeneralizedReminder = (props) => {
     return strTime;
   };
 
+  const handleDisabledNotifications = () => {
+    Alert.alert(
+      'Notification Permissions disabled',
+      'Please, allow the app to send you notifications in the settings',
+    );
+
+    Linking.openSettings();
+    //Linking.openURL('app-settings:');
+  };
+
   const handleSave = () => {
-    let selectedHours = `${time.getHours()}`;
-    let selectedMinutes = `${time.getMinutes()}`;
+    PushNotification.checkPermissions((perm) => {
+      if (!perm.alert && isEnabled) {
+        // Handle the case if Notifications are disabled
+        handleDisabledNotifications();
+        return;
+      } else {
+        let selectedHours = `${time.getHours()}`;
+        let selectedMinutes = `${time.getMinutes()}`;
 
-    let selectedTime =
-      type === 'after'
-        ? `${selectedHours}:${selectedMinutes}`
-        : `${formatAMPM()}`;
+        let selectedTime =
+          type === 'after'
+            ? `${selectedHours}:${selectedMinutes}`
+            : `${formatAMPM()}`;
 
-    if (type === 'after' && selectedHours === '0' && selectedMinutes === '0') {
-      Alert.alert(
-        'Time of the reminder is missing',
-        "Don't forget to specify the time of the reminder",
-      );
+        if (
+          type === 'after' &&
+          selectedHours === '0' &&
+          selectedMinutes === '0'
+        ) {
+          Alert.alert(
+            'Time of the reminder is missing',
+            "Don't forget to specify the time of the reminder",
+          );
 
-      return;
-    }
+          return;
+        }
 
-    // Identify if we need to add a new one or update existing one since component is generalized
-    props.type
-      ? ReminderFirestore.addReminderToDB(
-          isEnabled,
-          message,
-          selectedTime,
-          type,
-          userID,
-          props.data,
-        )
-      : ReminderFirestore.updateReminderDB(
-          isEnabled,
-          message,
-          selectedTime,
-          type,
-          userID,
-          props.route.params.reminder.id,
-        );
+        // Identify if we need to add a new one or update existing one since component is generalized
+        props.type
+          ? ReminderFirestore.addReminderToDB(
+              isEnabled,
+              message,
+              selectedTime,
+              type,
+              userID,
+              props.data,
+            )
+          : ReminderFirestore.updateReminderDB(
+              isEnabled,
+              message,
+              selectedTime,
+              type,
+              userID,
+              props.route.params.reminder.id,
+            );
 
-    // go to previous screen
-    props.navigation.navigate('List');
+        // go to previous screen
+        props.navigation.navigate('List');
+      }
+    });
   };
 
   const deleteReminder = () => {
@@ -130,11 +155,10 @@ const GeneralizedReminder = (props) => {
       setTime(date);
     } else {
       // Android
+      setShowOnAndroid(false);
       if (event.type !== 'dismissed') {
         setTime(date);
-        setShowOnAndroid(false);
       }
-      setShowOnAndroid(false);
     }
   };
 
@@ -152,15 +176,13 @@ const GeneralizedReminder = (props) => {
               : 'When would you like to get a reminder?'}
           </Text>
           {Platform.OS === 'android' && (
-            <>
-              <TouchableOpacity
-                style={styles.openSelectorBtn}
-                onPress={() => setShowOnAndroid(true)}>
-                <Text style={[styles.btnTxt, {color: 'black'}]}>
-                  Open time selector
-                </Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              onPress={() => setShowOnAndroid(true)}
+              style={styles.openTimePickerBtn}>
+              <Text style={[styles.btnText, {color: '#7d8aff'}]}>
+                Open time picker
+              </Text>
+            </TouchableOpacity>
           )}
           {outputDateTimePicker()}
         </View>
@@ -201,16 +223,17 @@ const styles = StyleSheet.create({
     width: '95%',
     padding: 10,
   },
-  openSelectorBtn: {
+  openTimePickerBtn: {
     width: '100%',
-    padding: 12,
     borderRadius: 20,
-    backgroundColor: '#7dff7d',
     alignItems: 'center',
-    justifyContent: 'center',
+    padding: 12,
     marginBottom: 10,
-    marginTop: 12,
+    backgroundColor: 'white',
+    borderWidth: 3,
+    borderColor: '#7d8aff',
     alignSelf: 'center',
+    marginTop: 15,
   },
   saveBtn: {
     width: '90%',

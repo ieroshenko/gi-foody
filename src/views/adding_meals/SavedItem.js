@@ -16,18 +16,25 @@ const SavedItem = (props) => {
     setIsEditVis(false);
   };
 
+  let imgTransformDeg = props.item.isAndroid ? '90deg' : '0deg';
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
         onPress={() => {
-          props.openPreview(props.item.picID, props.item.notes, true);
+          props.openPreview(
+            props.item.picID,
+            props.item.notes,
+            true,
+            props.item.isAndroid,
+          );
         }} //TODO: open preview and close itself
         style={styles.itemBtn}>
         <Image
           source={{
-            uri: `file://${RNFetchBlob.fs.dirs.CacheDir}/${props.item.picID}`,
+            uri: `file://${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${props.item.picID}`,
           }}
-          style={styles.img}
+          style={[styles.img, {transform: [{rotate: imgTransformDeg}]}]}
         />
         <Text style={styles.notes}>{props.item.notes}</Text>
         <TouchableOpacity onPress={openEditScreen}>

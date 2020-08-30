@@ -6,13 +6,15 @@ import {
   View,
   StyleSheet,
   FlatList,
+  TextInput,
 } from 'react-native';
 import {Icon} from 'react-native-elements';
 import React, {useState} from 'react';
 import firebase from '@react-native-firebase/app';
-import UserContext from '../../hooks/UserContext';
+import UserContext from '../../../hooks/UserContext';
 import DetailedMealItem from './DetailedMealItem';
 import SymptomEditable from './SymptomEditable';
+import {deleteMealDB} from '../../../wrappers/firestore/FirebaseWrapper';
 
 const MealDetails = (props) => {
   const userID = React.useContext(UserContext);
@@ -33,17 +35,10 @@ const MealDetails = (props) => {
 
   const deleteMeal = async (mealID) => {
     try {
-      await firebase
-        .firestore()
-        .collection('users')
-        .doc(userID)
-        .collection('meals')
-        .doc(mealID)
-        .delete()
-        .then(() =>
-          // Delete from flatlist
-          props.deleteMeal(mealID),
-        );
+      // Delete from flatlist
+      props.deleteMeal(mealID);
+      // delete from DB
+      await deleteMealDB(userID, mealID);
     } catch (e) {
       console.log(e);
     }
@@ -76,6 +71,17 @@ const MealDetails = (props) => {
             showsHorizontalScrollIndicator={false}
           />
           <View style={styles.symptomHolder}>
+            <View style={styles.sympNotesContainer}>
+              <Text style={styles.textSubheader}>Symptom Notes</Text>
+              <TextInput
+                value={props.symptomNotes}
+                style={styles.sympNotesInput}
+                onChangeText={(text) => props.setNotes(text)}
+                blurOnSubmit={true}
+                onBlur={props.updateSymptomNotes}
+                placeholder="Enter symptom notes"
+              />
+            </View>
             <Text style={styles.textSubheader}>Symptoms</Text>
             <View style={styles.symptoms}>
               <FlatList
@@ -142,6 +148,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 10,
     marginTop: 10,
+    marginBottom: 10,
     borderRadius: 5,
+  },
+  sympNotesContainer: {
+    marginTop: 25,
+    marginBottom: 25,
+  },
+  sympNotesInput: {
+    fontSize: 16,
+    fontFamily: 'System',
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    borderBottomWidth: 0.5,
+    width: '100%',
+    borderColor: 'gray',
+    paddingBottom: 10,
   },
 });

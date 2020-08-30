@@ -1,17 +1,18 @@
 import React, {useState} from 'react';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 import auth, {firebase} from '@react-native-firebase/auth';
-import SignUpScreen, {initSymptoms} from './SignUp';
+import SignUpScreen, {createNewDBUser} from './SignUp';
 import Modal from 'react-native-modal';
+import Logo from '../../../img/Logo.svg';
 import {
   SafeAreaView,
   View,
   Text,
-  Image,
   TouchableOpacity,
   TouchableHighlight,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 
 export const IntroScreen = (props) => {
@@ -24,7 +25,7 @@ export const IntroScreen = (props) => {
 
       if (response && response.user) {
         setModalVisible(false);
-        initSymptoms(response.user.uid);
+        createNewDBUser(response.user);
       }
     } catch (e) {
       setModalVisible(false);
@@ -34,63 +35,62 @@ export const IntroScreen = (props) => {
 
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: 'white'}}>
-      <View style={style.body}>
-        <View style={style.vertContainer}>
-          <Image
-            style={style.tinyLogo}
-            source={{uri: 'https://reactnative.dev/img/tiny_logo.png'}}
-          />
-          <Text style={[style.introHeaderText, style.text]}>GI Foody</Text>
-        </View>
-        <View style={style.introSectionContainer}>
-          <View>
-            <Text style={[style.introTitleText, style.text]}>
-              Find correlation between meals and symptoms
-            </Text>
+      <ScrollView>
+        <View style={style.body}>
+          <View style={style.vertContainer}>
+            <Logo height={30} width={30} />
+            <Text style={[style.introHeaderText, style.text]}>GI Foody</Text>
           </View>
-          <View style={style.introSectionUnderTitle}>
-            <Text style={[style.introTextUnderTitle, style.text]}>
-              Take a pic of your meal. Record Symptoms. Discover patterns.
-            </Text>
-          </View>
-          <View style={style.introSectionAuth}>
-            <TouchableHighlight
-              style={style.btnSignUp}
-              onPress={() => {
-                props.navigation.navigate('SignUpScreen');
-              }}
-              underlayColor="#346eeb">
-              <Text style={[style.text, style.signUpText]}>Sign up</Text>
-            </TouchableHighlight>
-          </View>
-          <View style={[style.vertContainer, style.introSignIn]}>
-            <TouchableOpacity
-              style={style.btnSignIn}
-              onPress={() => props.navigation.navigate('Sign In')}>
-              <Text style={[style.text, style.txtHaveAccount]}>
-                Already have an account?
+          <View style={style.introSectionContainer}>
+            <View>
+              <Text style={[style.introTitleText, style.text]}>
+                Find correlation between meals and symptoms
               </Text>
-              <Text style={[style.text, style.txtSignIn]}>Login</Text>
+            </View>
+            <View style={style.introSectionUnderTitle}>
+              <Text style={[style.introTextUnderTitle, style.text]}>
+                Take a pic of your meal. Record Symptoms. Discover patterns.
+              </Text>
+            </View>
+            <View style={style.introSectionAuth}>
+              <TouchableHighlight
+                style={style.btnSignUp}
+                onPress={() => {
+                  props.navigation.navigate('SignUpScreen');
+                }}
+                underlayColor="#346eeb">
+                <Text style={[style.text, style.signUpText]}>Sign up</Text>
+              </TouchableHighlight>
+            </View>
+            <View style={[style.vertContainer, style.introSignIn]}>
+              <TouchableOpacity
+                style={style.btnSignIn}
+                onPress={() => props.navigation.navigate('Sign In')}>
+                <Text style={[style.text, style.txtHaveAccount]}>
+                  Already have an account?
+                </Text>
+                <Text style={[style.text, style.txtSignIn]}>Login</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={style.btnSkip}
+              onPress={logUserInAnonymously}>
+              <Text style={[style.text, style.txtSkip]}>Skip for now</Text>
             </TouchableOpacity>
+            <Modal
+              backdropOpacity={0.5}
+              isVisible={modalVisible}
+              transparent={true}
+              onBackdropPress={() => setModalVisible(false)}>
+              <ActivityIndicator
+                style={{alignSelf: 'center'}}
+                size="large"
+                color="white"
+              />
+            </Modal>
           </View>
-          <TouchableOpacity
-            style={style.btnSkip}
-            onPress={logUserInAnonymously}>
-            <Text style={[style.text, style.txtSkip]}>Skip for now</Text>
-          </TouchableOpacity>
-          <Modal
-            backdropOpacity={0.5} //TODO: update it later
-            isVisible={modalVisible}
-            transparent={true}
-            onBackdropPress={() => setModalVisible(false)}>
-            <ActivityIndicator
-              style={{alignSelf: 'center'}}
-              size="large"
-              color="white"
-            />
-          </Modal>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -115,7 +115,7 @@ const style = StyleSheet.create({
     marginTop: 80,
   },
   introSignIn: {
-    marginTop: 40,
+    marginTop: 30,
     justifyContent: 'center',
   },
   tinyLogo: {
@@ -164,7 +164,7 @@ const style = StyleSheet.create({
     paddingLeft: 7,
     paddingRight: 7,
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 20,
   },
   txtSignIn: {
     color: '#f5a142',

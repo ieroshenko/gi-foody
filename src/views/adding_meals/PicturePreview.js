@@ -13,14 +13,14 @@ import {
   Platform,
 } from 'react-native';
 import React, {useState} from 'react';
-import {addToFavorites, addNewMealItem} from '../../wrappers/FirebaseWrapper';
-import firebase from '@react-native-firebase/app';
-import firestore from '@react-native-firebase/firestore';
+import {
+  addToFavorites,
+  addNewMealItem,
+} from '../../wrappers/firestore/FirebaseWrapper';
 import {Icon} from 'react-native-elements';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import UserContext from '../../hooks/UserContext';
 import NetInfoContext from '../../hooks/NetInfoContext';
-import * as NotificationsController from '../../services/LocalPushController';
 import AwesomeAlert from 'react-native-awesome-alerts';
 
 export const ImagePreview = (props) => {
@@ -44,10 +44,15 @@ export const ImagePreview = (props) => {
   }
 
   // check if device is android
-  let isAndroid = Platform.OS === 'android' ? true : false;
+  let isAndroid;
+  if (fromFavorites) {
+    isAndroid = props.isAndroid;
+  } else {
+    isAndroid = Platform.OS === 'android' ? true : false;
+  }
 
   const moveImgToCache = async () => {
-    let newDir = `${RNFetchBlob.fs.dirs.CacheDir}/${imgID}`;
+    let newDir = `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${imgID}`;
 
     try {
       await RNFetchBlob.fs.mv(
@@ -83,6 +88,7 @@ export const ImagePreview = (props) => {
     // move the pic from cache/camera dir to cache dir (NOT THE BEST SOLUTION)
 
     let newDir = await moveImgToCache();
+    let combineMeals = props.combineMeals;
 
     addNewMealItem(
       imgID,
@@ -93,6 +99,8 @@ export const ImagePreview = (props) => {
       isNetOnline,
       props.reminders,
       isFavorited || fromFavorites,
+      combineMeals,
+      props.symptoms,
     );
 
     // Navigate to Eating Journal and scroll to top
@@ -117,7 +125,7 @@ export const ImagePreview = (props) => {
             <Image
               source={{
                 uri: fromFavorites
-                  ? `file://${RNFetchBlob.fs.dirs.CacheDir}/${imgID}`
+                  ? `file://${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${imgID}`
                   : props.imgUri,
               }}
               style={[
@@ -141,10 +149,12 @@ export const ImagePreview = (props) => {
       <View style={styles.closeIconContainer}>
         <TouchableOpacity
           onPress={() => {
-            // remove the image locally
-            RNFetchBlob.fs.unlink(
-              `${RNFetchBlob.fs.dirs.CacheDir}/Camera/${imgID}`,
-            );
+            if (!fromFavorites) {
+              // remove the image locally
+              RNFetchBlob.fs.unlink(
+                `${RNFetchBlob.fs.dirs.CacheDir}/Camera/${imgID}`,
+              );
+            }
             props.onCloseClick();
           }}>
           <Icon name="close" size={30} color="gray" />

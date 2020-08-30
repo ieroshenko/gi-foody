@@ -1,50 +1,15 @@
 import {
   FlatList,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  StyleSheet,
-  SafeAreaView,
 } from 'react-native';
-import React from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
-import Reminder from './Reminder';
-import GeneralizedReminder from './GeneralizedReminder';
-
-const Stack = createStackNavigator();
-
-const RemindersHomeScreen = (props) => {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="List">
-        {(navigationProps) => (
-          <ReminderList data={props.data} {...navigationProps} />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="add-new-after">
-        {(navigationProps) => (
-          <GeneralizedReminder
-            data={props.data}
-            {...navigationProps}
-            type="after"
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="add-new-fixed">
-        {(navigationProps) => (
-          <GeneralizedReminder
-            data={props.data}
-            {...navigationProps}
-            type="fixed"
-          />
-        )}
-      </Stack.Screen>
-      <Stack.Screen name="existing">
-        {(navigationProps) => <GeneralizedReminder {...navigationProps} />}
-      </Stack.Screen>
-    </Stack.Navigator>
-  );
-};
+import ReminderListItem from './ReminderListItem';
+import React, {useEffect} from 'react';
+import PushNotification from 'react-native-push-notification';
+import {deactivateAllReminders} from '../../services/LocalPushController';
 
 const ReminderList = (props) => {
   return (
@@ -57,14 +22,19 @@ const ReminderList = (props) => {
             }}
             data={props.data}
             renderItem={({item}) => (
-              <Reminder reminder={item} navigation={props.navigation} />
+              <ReminderListItem reminder={item} navigation={props.navigation} />
             )}
             keyExtractor={(item, index) => item.id}
             scrollEnabled={true}
             alwaysBounceVertical={true}
           />
         ) : (
-          <Text>Empty. Add your first reminder!</Text>
+          <View style={styles.emptyDataContainer}>
+            <Text style={styles.emptyDataTitle}>Add your first reminder!</Text>
+            <Text style={styles.emptyDataText}>
+              Click on one of the buttons below to do so.
+            </Text>
+          </View>
         )}
       </View>
       <View style={styles.bottomBtnBar}>
@@ -84,10 +54,10 @@ const ReminderList = (props) => {
   );
 };
 
-export default RemindersHomeScreen;
+export default ReminderList;
 
 const styles = StyleSheet.create({
-  mainContainer: {flex: 1},
+  mainContainer: {flex: 1, backgroundColor: 'white'},
   bottomBtnBar: {
     width: '100%',
     height: 180,
@@ -118,5 +88,28 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
     color: 'white',
     fontWeight: '600',
+  },
+  emptyDataContainer: {
+    backgroundColor: 'white',
+    borderRadius: 30,
+    padding: 40,
+    marginTop: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  emptyDataTitle: {
+    fontWeight: '700',
+    fontFamily: 'System',
+    fontSize: 18,
+    marginBottom: 10,
+    color: '#7d8aff',
+    textAlign: 'center',
+  },
+  emptyDataText: {
+    fontFamily: 'System',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

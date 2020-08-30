@@ -47,13 +47,11 @@ const EnabledCameraView = (camera, takePicture) => (
       flexDirection: 'row',
       justifyContent: 'center',
     }}>
-    <SvgUri
-      style={styles.capture}
-      width={75}
-      height={75}
-      uri={'https://svgur.com/i/M6s.svg'}
+    <TouchableOpacity
       onPress={() => takePicture(camera)}
-    />
+      style={styles.capture}>
+      <Icon name="panorama-fish-eye" size={75} color="white" />
+    </TouchableOpacity>
   </View>
 );
 
@@ -77,7 +75,7 @@ const CameraView = (props) => {
 
   const takePicture = async (camera) => {
     const options = {
-      quality: 0.4,
+      quality: 0.3,
     };
     const data = await camera.takePictureAsync(options);
     props.openPreview(data.uri, '', false);
@@ -190,7 +188,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'yellow',
   },
   capture: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   pendingView: {
     flex: 1,

@@ -1,13 +1,7 @@
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import React, {useEffect, useState} from 'react';
-import UserContext from './hooks/UserContext';
-import NetInfo from '@react-native-community/netinfo';
-import {firebase} from '@react-native-firebase/auth';
-import {handleOfflineImages} from './wrappers/FirebaseWrapper';
-import {handleAnyQueuedCloudPicDeletions} from './wrappers/CloudStorageWrapper';
-import NetInfoContext from './hooks/NetInfoContext';
 import {Dimensions, StyleSheet} from 'react-native';
-import Journal from './views/journal/Journal';
+import Journal from './views/journal/tracking_journal/Journal';
 import {CameraModalScreen} from './views/adding_meals/AddNewController';
 import Profile from './views/profile/ProfileView';
 import {Icon} from 'react-native-elements';
@@ -31,62 +25,46 @@ const EmptyModalScreen = () => {
 };
 
 const MainTabs = (props) => {
-  const userID = React.useContext(UserContext);
-  const [isNetOnline, setIsNetOnline] = useState(true);
-
-  console.log(props.isAnonymous);
-
-  useEffect(() => {
-    // Add NetInfo
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      let isNetOnline = state.isConnected && state.isInternetReachable;
-      if (isNetOnline) {
-        firebase.firestore().enableNetwork();
-        handleOfflineImages(userID);
-        handleAnyQueuedCloudPicDeletions(userID);
-        //Alert.alert('Yay', 'inet is online');
-      } else {
-        firebase.firestore().disableNetwork();
-        //Alert.alert('Nope', 'inet is offline');
-      }
-      setIsNetOnline(isNetOnline);
-    });
-
-    // Unsubscribe on component unmount
-    return () => unsubscribe();
-  }, []);
-
   return (
-    <NetInfoContext.Provider value={isNetOnline}>
-      <bottomTab.Navigator
-        initialRouteName="Journal"
-        tabBarOptions={tabBarOptions}>
-        <bottomTab.Screen
-          name="Journal"
-          options={{
-            tabBarIcon: JournalIcon,
-            tabBarLabel: 'Journal',
-          }}
-          component={Journal}
-        />
-        <bottomTab.Screen
-          name="Snap"
-          component={EmptyModalScreen}
-          options={{
-            tabBarIcon: SnapIcon,
-            tabBarLabel: 'Snap',
-            tabBarButton: (navProps) => (
-              <CameraModalScreen {...navProps} reminders={props.reminders} />
-            ),
-          }}
-        />
-        <bottomTab.Screen
-          name="Profile"
-          options={{tabBarIcon: ProfileIcon, tabBarLabel: 'Profile'}}>
-          {() => <Profile isAnonymous={props.isAnonymous} />}
-        </bottomTab.Screen>
-      </bottomTab.Navigator>
-    </NetInfoContext.Provider>
+    <bottomTab.Navigator
+      initialRouteName="Journal"
+      tabBarOptions={tabBarOptions}>
+      <bottomTab.Screen
+        name="Journal"
+        options={{
+          tabBarIcon: JournalIcon,
+          tabBarLabel: 'Journal',
+        }}
+        component={Journal}
+      />
+      <bottomTab.Screen
+        name="Snap"
+        component={EmptyModalScreen}
+        options={{
+          tabBarIcon: SnapIcon,
+          tabBarLabel: 'Snap',
+          tabBarButton: (navProps) => (
+            <CameraModalScreen
+              {...navProps}
+              reminders={props.reminders}
+              combineMeals={props.combineMeals}
+              symptoms={props.symptoms}
+            />
+          ),
+        }}
+      />
+      <bottomTab.Screen
+        name="Profile"
+        options={{tabBarIcon: ProfileIcon, tabBarLabel: 'Profile'}}>
+        {() => (
+          <Profile
+            isAnonymous={props.isAnonymous}
+            symptoms={props.symptoms}
+            unAnonymize={props.unAnonymize}
+          />
+        )}
+      </bottomTab.Screen>
+    </bottomTab.Navigator>
   );
 };
 

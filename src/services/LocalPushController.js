@@ -1,27 +1,21 @@
 import PushNotification from 'react-native-push-notification';
 import {Alert, Platform} from 'react-native';
-import {updateScheduledStatus} from '../wrappers/RemindersDBManagement';
-import Database from '../Sqlite';
-import {not} from 'react-native-reanimated';
-
-const db = new Database();
+import {
+  updateScheduledStatus,
+  deactivateAllActiveRems,
+} from '../wrappers/firestore/RemindersDBManagement';
+import Database from '../wrappers/sqlite/SqliteFasade';
 
 PushNotification.configure({
   // (required) Called when a remote or local notification is opened or received
   onNotification: function (notification) {
     let fieldDataFieldName = Platform.OS === 'ios' ? 'data' : 'userInfo';
-    console.log(notification);
     if (notification[fieldDataFieldName].type === 'after') {
       unscheduleReminder(notification[fieldDataFieldName].id);
     }
-    if (notification.foreground) {
-      Alert.alert('A raven from the Capital!', notification.message, [
-        {text: 'Thanks', onPress: () => null},
-      ]);
-    }
   },
   popInitialNotification: true,
-  requestPermissions: true,
+  requestPermissions: false,
 });
 
 export const scheduleAfterMealReminders = async (userID, reminders) => {
@@ -45,13 +39,11 @@ export const scheduleAfterMealReminders = async (userID, reminders) => {
       playSound: true,
       soundName: 'default',
       date: new Date(Date.now() + timeConverted),
-      userInfo: {type: reminder.type, id: reminder.id},
+      userInfo: {type: reminder.type, id: reminder.id, msg: reminder.message},
     });
 
     updateScheduledStatus(reminder.id, true);
   });
-
-  console.log('done!');
 };
 
 export const scheduleFixedReminders = async (userID, reminders) => {
@@ -59,7 +51,7 @@ export const scheduleFixedReminders = async (userID, reminders) => {
 
   for (let i = 0; i < reminders.length; i++) {
     let reminder = reminders[i];
-    let sqlRem = await db.getReminderById(reminder.id);
+    let sqlRem = await Database.getReminderById(reminder.id);
 
     if (reminder.type === 'fixed' && reminder.isActive && !sqlRem.isScheduled) {
       remindersForScheduling.push(reminder);
@@ -82,7 +74,7 @@ export const scheduleFixedReminders = async (userID, reminders) => {
       playSound: true,
       soundName: 'default',
       date: reminderDate,
-      userInfo: {type: reminder.type, id: reminder.id},
+      userInfo: {type: reminder.type, id: reminder.id, msg: reminder.message},
       repeatType: 'day',
     });
 
@@ -90,7 +82,7 @@ export const scheduleFixedReminders = async (userID, reminders) => {
   });
 };
 
-const getFixedReminderDate = (rHour, rMin, currentDate) => {
+export const getFixedReminderDate = (rHour, rMin, currentDate) => {
   let tYear = currentDate.getFullYear();
   let tMonth = currentDate.getMonth();
   let tDay = currentDate.getDate();
@@ -109,7 +101,7 @@ const getFixedReminderDate = (rHour, rMin, currentDate) => {
   return reminderDate;
 };
 
-const convertAMPMto24 = (time) => {
+export const convertAMPMto24 = (time) => {
   let [hours, minsAndAMPM] = time.split(':');
   let [minutes, AMPM] = minsAndAMPM.split(' ');
 
@@ -127,9 +119,8 @@ const convertAMPMto24 = (time) => {
 };
 
 export const cancelNecessaryReminders = (userID, reminders) => {
-  console.log('cancelNecessaryReminders');
   reminders.forEach((reminder) => {
-    db.getReminderById(reminder.id).then((sqlReminder) => {
+    Database.getReminderById(reminder.id).then((sqlReminder) => {
       if (!reminder.isActive && sqlReminder.isScheduled) {
         unscheduleReminder(reminder.id);
       }
@@ -140,14 +131,14 @@ export const cancelNecessaryReminders = (userID, reminders) => {
 };
 
 const syncOfflineOnlineReminders = async (reminders) => {
-  let sqlRems = await db.listReminders();
+  let sqlRems = await Database.listReminders();
   let sqlRemsById = sqlRems.map((sqlRem) => sqlRem.reminderId);
 
   let remsById = reminders.map((rem) => rem.id);
 
   sqlRemsById.forEach((sqlRemId) => {
     if (!remsById.includes(sqlRemId)) {
-      db.deleteReminder(sqlRemId);
+      Database.deleteReminder(sqlRemId);
     }
   });
 };
@@ -155,4 +146,9 @@ const syncOfflineOnlineReminders = async (reminders) => {
 export const unscheduleReminder = (reminderID) => {
   PushNotification.cancelLocalNotifications({id: reminderID});
   updateScheduledStatus(reminderID, false);
+};
+
+export const deactivateAllReminders = (userID) => {
+  PushNotification.cancelAllLocalNotifications();
+  deactivateAllActiveRems(userID);
 };

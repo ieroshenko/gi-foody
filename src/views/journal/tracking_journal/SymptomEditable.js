@@ -1,6 +1,6 @@
 import React from 'react';
-import UserContext from '../../hooks/UserContext';
-import {sympColors} from './TrackingJournal';
+import UserContext from '../../../hooks/UserContext';
+import {sympColors} from '../../../constants/SymptomColors';
 import firebase from '@react-native-firebase/app';
 import {Platform, Text, View, StyleSheet} from 'react-native';
 import {Slider} from 'react-native-elements';
@@ -22,7 +22,7 @@ const SymptomEditable = (props) => {
       .collection('meals')
       .doc(props.mealID)
       .update(fieldMapToBeUpdated)
-      .then(() => console.log('yay!'));
+      .then(() => console.log('updated symptom value'));
 
     // Update parent component's value
     props.updateParentSymptom(sympID, sympValue);

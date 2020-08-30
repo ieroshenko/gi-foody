@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import firebase from '@react-native-firebase/app';
 import {
   Image,
@@ -7,12 +7,28 @@ import {
   View,
   StyleSheet,
 } from 'react-native';
-import {deleteMealItem} from '../../wrappers/FirebaseWrapper';
+import {
+  deleteMealItem,
+  getMealItemImgUri,
+} from '../../../wrappers/firestore/FirebaseWrapper';
 import {Icon} from 'react-native-elements';
+import UserContext from '../../../hooks/UserContext';
+import NetInfoContext from '../../../hooks/NetInfoContext';
 
 const DetailedMealItem = (props) => {
+  const isNetOnline = React.useContext(NetInfoContext);
   const [note, setNote] = useState(props.item.notes);
   const [noteHeight, setNoteHeight] = useState(0);
+  const [imgUri, setImgUri] = useState(null);
+  const userID = React.useContext(UserContext);
+
+  useEffect(() => {
+    getMealItemImgUri(
+      userID,
+      props.item.picID,
+      isNetOnline,
+    ).then((newPicPath) => setImgUri(newPicPath));
+  }, []);
 
   const updateNotesInDatabase = async () => {
     await firebase
@@ -31,17 +47,25 @@ const DetailedMealItem = (props) => {
     let mealID = props.item.mealID;
     let imgID = props.item.picID;
     let itemTime = props.item.timeStamp.toDate().getTime().toString();
-    let wasAddedToFavorites = props.item.fromFavorites;
     // Delete from DB, cloudstorage and cache
-    deleteMealItem(theItemID, mealID, imgID, itemTime, wasAddedToFavorites);
+    deleteMealItem(theItemID, mealID, imgID, itemTime, userID);
     // Delete from array of items
     props.deleteMealItem(theItemID, mealID);
   };
 
+  let imgTransformDeg = props.item.isAndroid ? '90deg' : '0deg';
+
   return (
     <View style={styles.mealItem}>
       <View style={styles.container}>
-        <Image source={{uri: props.item.picPath}} style={styles.image} />
+        {imgUri ? (
+          <Image
+            source={{uri: imgUri}}
+            style={[styles.image, {transform: [{rotate: imgTransformDeg}]}]}
+          />
+        ) : (
+          <View style={styles.image} />
+        )}
         <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
           <Icon
             name="delete"

@@ -2,11 +2,11 @@ import React, {useEffect, useReducer, useState} from 'react';
 import CameraView from './CameraView';
 import Modal from 'react-native-modal';
 import SavedMealItems from './SavedMealItems';
-import {StyleSheet} from 'react-native';
+import {Platform, StyleSheet} from 'react-native';
 import UserContext from '../../hooks/UserContext';
 import firebase from '@react-native-firebase/app';
 import {ImagePreview} from './PicturePreview';
-import {loadUncachedFavorites} from '../../wrappers/FirebaseWrapper';
+import {loadUncachedFavorites} from '../../wrappers/firestore/FirebaseWrapper';
 
 const AddNewHome = (props) => {
   const userID = React.useContext(UserContext);
@@ -17,6 +17,7 @@ const AddNewHome = (props) => {
     notes: '',
     fromFavorites: false,
     isPrevVis: false,
+    isAndroid: Platform.OS === 'android',
   });
 
   useEffect(() => {
@@ -32,7 +33,9 @@ const AddNewHome = (props) => {
         }));
 
         // load uncached saved meals from cloud
-        loadUncachedFavorites(savedMeals).then(setSavedMeals(savedMeals));
+        loadUncachedFavorites(savedMeals, userID).then(
+          setSavedMeals(savedMeals),
+        );
       });
 
     return () => unsubscribe();
@@ -46,7 +49,7 @@ const AddNewHome = (props) => {
     setIsSavedVis(false);
   };
 
-  const openPreview = (imgUri, notes, fromFavorites) => {
+  const openPreview = (imgUri, notes, fromFavorites, isAndroid) => {
     // close savedImagesView to try avoid conflict
     if (fromFavorites) {
       setIsSavedVis(false);
@@ -57,6 +60,7 @@ const AddNewHome = (props) => {
           notes: notes,
           fromFavorites: fromFavorites,
           isPrevVis: true,
+          isAndroid: isAndroid,
         });
       }, 700);
     } else {
@@ -100,8 +104,11 @@ const AddNewHome = (props) => {
           imgUri={previewData.imgUri}
           notes={previewData.notes}
           fromFavorites={previewData.fromFavorites}
+          isAndroid={previewData.isAndroid}
           onCloseClick={closePreview}
           reminders={props.reminders}
+          combineMeals={props.combineMeals}
+          symptoms={props.symptoms}
         />
       </Modal>
     </>

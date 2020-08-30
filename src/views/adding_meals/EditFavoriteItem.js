@@ -14,7 +14,10 @@ import React, {useState} from 'react';
 import RNFetchBlob from 'rn-fetch-blob';
 import {Icon} from 'react-native-elements';
 import UserContext from '../../hooks/UserContext';
-import {updateNotes, deleteFavMealItem} from '../../wrappers/FirebaseWrapper';
+import {
+  updateNotes,
+  deleteFavMealItem,
+} from '../../wrappers/firestore/FirebaseWrapper';
 import NetInfoContext from '../../hooks/NetInfoContext';
 
 const EditFavScreen = (props) => {
@@ -28,19 +31,19 @@ const EditFavScreen = (props) => {
   };
 
   const handleDelete = () => {
-    console.log('what?');
     deleteFavMealItem(
       userID,
       props.item.id,
       props.item.picID,
       isNetOnline,
     ).then((isInUse) => {
-      console.log(isInUse);
       // if (!isInUse) {
       //   props.onClose();
       // }
     });
   };
+
+  let imgTransformDeg = props.item.isAndroid ? '90deg' : '0deg';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -58,9 +61,9 @@ const EditFavScreen = (props) => {
           contentContainerStyle={styles.scrollViewContent}>
           <Image
             source={{
-              uri: `file://${RNFetchBlob.fs.dirs.CacheDir}/${props.item.picID}`,
+              uri: `file://${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${props.item.picID}`,
             }}
-            style={styles.image}
+            style={[styles.image, {transform: [{rotate: imgTransformDeg}]}]}
           />
           <View style={styles.noteContainer}>
             <Text style={styles.noteLabel}>Note</Text>

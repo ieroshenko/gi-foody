@@ -80,19 +80,24 @@ const styles = StyleSheet.create({
   emptyDataContainer: {
     backgroundColor: 'white',
     borderRadius: 30,
-    padding: 50,
+    padding: 40,
     marginTop: 150,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '90%',
+    alignSelf: 'center',
   },
   emptyDataTitle: {
     fontWeight: '700',
     fontFamily: 'System',
-    fontSize: 15,
+    fontSize: 18,
     marginBottom: 10,
+    color: '#7d8aff',
+    textAlign: 'center',
   },
   emptyDataText: {
     fontFamily: 'System',
-    fontSize: 15,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

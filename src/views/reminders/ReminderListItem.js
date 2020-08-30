@@ -1,8 +1,7 @@
-import {Text, TouchableOpacity, View, StyleSheet, FlatList} from 'react-native';
+import {Text, TouchableOpacity, View, StyleSheet} from 'react-native';
 import React from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
 
-const Reminder = (props) => {
+const ReminderListItem = (props) => {
   let reminderTimeText = '';
 
   if (props.reminder.type === 'after') {
@@ -38,7 +37,7 @@ const Reminder = (props) => {
   );
 };
 
-export default Reminder;
+export default ReminderListItem;
 
 const styles = StyleSheet.create({
   mainButton: {

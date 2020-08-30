@@ -10,9 +10,18 @@ import {
   TextInput,
   TouchableHighlight,
   ScrollView,
-  Alert,
   ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+  Platform,
 } from 'react-native';
+import {deleteUser} from '../../wrappers/firestore/FirebaseWrapper';
+import appleAuth, {
+  AppleAuthRequestOperation,
+  AppleAuthRequestScope,
+  AppleButton,
+} from '@invertase/react-native-apple-authentication';
+import {createNewDBUser} from './SignUp';
 
 const SignInScreen = (props) => {
   const [email, setEmail] = useState('');
@@ -20,6 +29,43 @@ const SignInScreen = (props) => {
   const [error, setError] = useState('');
   const [isValid, setValid] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const onAppleBtnPress = async () => {
+    try {
+      // Start the sign-in request
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: AppleAuthRequestOperation.LOGIN,
+        requestedScopes: [
+          AppleAuthRequestScope.EMAIL,
+          AppleAuthRequestScope.FULL_NAME,
+        ],
+      });
+
+      // Ensure Apple returned a user identityToken
+      if (!appleAuthRequestResponse.identityToken) {
+        throw 'Apple Sign-In failed - no identify token returned';
+      }
+
+      // Create a Firebase credential from the response
+      const {identityToken, nonce} = appleAuthRequestResponse;
+      const appleCredential = firebase.auth.AppleAuthProvider.credential(
+        identityToken,
+        nonce,
+      );
+
+      // Sign-in the user with the credential
+      let response = await firebase
+        .auth()
+        .signInWithCredential(appleCredential);
+      if (response && response.user) {
+        await createNewDBUser(response.user);
+        setModalVisible(false);
+      }
+    } catch (e) {
+      setError(e.message);
+      setModalVisible(false);
+    }
+  };
 
   const facebookLogIn = async () => {
     try {
@@ -51,11 +97,11 @@ const SignInScreen = (props) => {
         .auth()
         .signInWithCredential(facebookCredential);
       if (response && response.user) {
+        await createNewDBUser(response.user);
         setModalVisible(false);
-        Alert.alert('Yep', 'Signed Up/In!');
       }
     } catch (e) {
-      setError(e);
+      setError(e.message);
       setModalVisible(false);
     }
   };
@@ -67,6 +113,10 @@ const SignInScreen = (props) => {
         .auth()
         .signInWithEmailAndPassword(email, password);
       if (response && response.user) {
+        // previously signed in anonymously and just signed in
+        if (props.anonUserId) {
+          deleteUser(props.anonUserId);
+        }
         setModalVisible(false);
       }
     } catch (e) {
@@ -107,6 +157,37 @@ const SignInScreen = (props) => {
     return re.test(String(email).toLowerCase());
   };
 
+  const handlePasswordReset = () => {
+    // check if email is valid
+    if (!email) {
+      setError('Email required *');
+      setValid(false);
+      return;
+    } else if (!isValidEmail(email)) {
+      setError('Invalid Email');
+      setValid(false);
+      return;
+    } else {
+      setError;
+      setValid(true);
+
+      let auth = firebase.auth();
+
+      auth
+        .sendPasswordResetEmail(email)
+        .then(() =>
+          Alert.alert(
+            'Reset link has been sent',
+            'Check your email for Reset Password Link to reset your password',
+          ),
+        )
+        .catch((e) => {
+          setError(e.message);
+          setValid(false);
+        });
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.contentContainer}>
@@ -120,7 +201,7 @@ const SignInScreen = (props) => {
             style={styles.textInputStyle}
             placeholder="Mail address"
             onChangeText={(text) => {
-              setError;
+              setError('');
               setEmail(text);
             }}
             error={isValid}
@@ -143,19 +224,34 @@ const SignInScreen = (props) => {
             <Text style={styles.errorTextStyle}>{error}</Text>
           </View>
         ) : null}
+        <TouchableOpacity
+          onPress={handlePasswordReset}
+          style={styles.resetPasswordBtn}>
+          <Text style={styles.resetPasswordTxt}>Forgot password?</Text>
+        </TouchableOpacity>
         <View style={styles.buttonsContainerStyle}>
           <TouchableHighlight
             style={styles.signInValidButtonStyle}
             onPress={doSignIn}
             underlayColor={blue}>
-            <Text style={styles.loginTextStyle}>LOG IN</Text>
+            <Text style={styles.loginTextStyle}>Log in</Text>
           </TouchableHighlight>
           <Text style={styles.textOr}>OR</Text>
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleButtonContainer}>
+              <AppleButton
+                buttonType={AppleButton.Type.SIGN_IN}
+                buttonStyle={AppleButton.Style.BLACK}
+                style={styles.appleButton}
+                onPress={onAppleBtnPress}
+              />
+            </View>
+          )}
           <TouchableHighlight
             style={styles.facebookButtonStyle}
             onPress={facebookLogIn}
             underlayColor={blue}>
-            <Text style={styles.loginTextStyle}>LOG IN WITH FACEBOOK</Text>
+            <Text style={styles.loginTextStyle}>Log in with Facebook</Text>
           </TouchableHighlight>
         </View>
         <Modal
@@ -229,12 +325,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   buttonsContainerStyle: {
+    marginTop: 23,
     alignItems: 'center',
     height: 300,
-    marginTop: 30,
   },
   signInValidButtonStyle: {
-    flex: 0.25,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#FFB62E',
     width: '90%',
@@ -243,16 +339,30 @@ const styles = StyleSheet.create({
   },
   loginTextStyle: {
     color: 'white',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '500',
   },
   facebookButtonStyle: {
-    flex: 0.25,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#3b5998',
     width: '90%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  appleButtonContainer: {
+    height: 70,
+    width: '90%',
+    overflow: 'hidden',
+    borderRadius: 30,
+    marginBottom: 10,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  appleButton: {
+    height: 55,
+    width: '100%',
   },
   textOr: {marginTop: 10, marginBottom: 10},
   privacyPolicyText: {
@@ -261,4 +371,6 @@ const styles = StyleSheet.create({
     color: 'gray',
     textAlign: 'center',
   },
+  resetPasswordBtn: {alignSelf: 'center', marginTop: 10},
+  resetPasswordTxt: {color: '#7d8aff'},
 });

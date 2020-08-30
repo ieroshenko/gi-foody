@@ -3,7 +3,7 @@ import {Colors} from 'react-native/Libraries/NewAppScreen';
 import {LoginManager, AccessToken} from 'react-native-fbsdk';
 import auth, {firebase} from '@react-native-firebase/auth';
 import Modal from 'react-native-modal';
-import {sendEmailVerification} from './SignUp';
+import {createNewDBUser, sendEmailVerification} from './SignUp';
 import {
   View,
   StyleSheet,
@@ -14,7 +14,13 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import appleAuth, {
+  AppleAuthRequestOperation,
+  AppleAuthRequestScope,
+  AppleButton,
+} from '@invertase/react-native-apple-authentication';
 
 const SignUpAnonymousScreen = (props) => {
   const [email, setEmail] = useState('');
@@ -30,7 +36,6 @@ const SignUpAnonymousScreen = (props) => {
       .signInWithCredential(providerCredential);
     if (response && response.user) {
       setModalVisible(false);
-      Alert.alert('Yep', 'Signed In!');
       props.closeModal();
     }
   };
@@ -77,6 +82,37 @@ const SignUpAnonymousScreen = (props) => {
       });
   };
 
+  const onAppleBtnPress = async () => {
+    try {
+      setModalVisible(true);
+      // Start the sign-in request
+      const appleAuthRequestResponse = await appleAuth.performRequest({
+        requestedOperation: AppleAuthRequestOperation.LOGIN,
+        requestedScopes: [
+          AppleAuthRequestScope.EMAIL,
+          AppleAuthRequestScope.FULL_NAME,
+        ],
+      });
+
+      // Ensure Apple returned a user identityToken
+      if (!appleAuthRequestResponse.identityToken) {
+        throw 'Apple Sign-In failed - no identify token returned';
+      }
+
+      // Create a Firebase credential from the response
+      const {identityToken, nonce} = appleAuthRequestResponse;
+      const appleCredential = firebase.auth.AppleAuthProvider.credential(
+        identityToken,
+        nonce,
+      );
+
+      tryLinkTheAccount(appleCredential, 'apple');
+    } catch (e) {
+      setError(e.message);
+      setModalVisible(false);
+    }
+  };
+
   const facebookSignUp = async () => {
     try {
       setModalVisible(true);
@@ -104,7 +140,7 @@ const SignUpAnonymousScreen = (props) => {
 
       tryLinkTheAccount(facebookCredential, 'facebook');
     } catch (e) {
-      setError(e);
+      setError(e.message);
       setModalVisible(false);
     }
   };
@@ -177,7 +213,7 @@ const SignUpAnonymousScreen = (props) => {
 
           <TextInput
             label={'Password'}
-            secureTextEntry
+            secureTextEntry={true}
             style={styles.textInputStyle}
             selectionColor={blue}
             placeholder="Password"
@@ -196,21 +232,31 @@ const SignUpAnonymousScreen = (props) => {
             style={styles.signInValidButtonStyle}
             onPress={doSignUp}
             underlayColor={blue}>
-            <Text style={styles.getStartedTextStyle}>SIGN UP</Text>
+            <Text style={styles.getStartedTextStyle}>Sign up</Text>
           </TouchableHighlight>
           <Text style={styles.textOr}>OR</Text>
+          {Platform.OS === 'ios' && (
+            <View style={styles.appleButtonContainer}>
+              <AppleButton
+                buttonType={AppleButton.Type.SIGN_UP}
+                buttonStyle={AppleButton.Style.BLACK}
+                style={styles.appleButton}
+                onPress={onAppleBtnPress}
+              />
+            </View>
+          )}
           <TouchableHighlight
             style={styles.facebookButtonStyle}
             onPress={facebookSignUp}
             underlayColor={blue}>
             <Text style={styles.getStartedTextStyle}>
-              SIGN UP WITH FACEBOOK
+              Sign up with Facebook
             </Text>
           </TouchableHighlight>
-          <Text style={styles.privacyPolicyText}>
-            By continuing, you agree to GI-Foody's Terms & Conditions and
-            Privacy Policy
-          </Text>
+          {/*<Text style={styles.privacyPolicyText}>*/}
+          {/*  By continuing, you agree to GI-Foody's Terms & Conditions and*/}
+          {/*  Privacy Policy*/}
+          {/*</Text>*/}
         </View>
         <Modal
           backdropOpacity={0.5} //TODO: update it later
@@ -288,7 +334,7 @@ const styles = StyleSheet.create({
     height: 300,
   },
   signInValidButtonStyle: {
-    flex: 0.3,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#2AE03E',
     width: '90%',
@@ -297,16 +343,30 @@ const styles = StyleSheet.create({
   },
   getStartedTextStyle: {
     color: 'white',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '500',
   },
   facebookButtonStyle: {
-    flex: 0.3,
+    height: 70,
     borderRadius: 30,
     backgroundColor: '#3b5998',
     width: '90%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  appleButton: {
+    height: 55,
+    width: '100%',
+  },
+  appleButtonContainer: {
+    height: 70,
+    width: '90%',
+    overflow: 'hidden',
+    borderRadius: 30,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   textOr: {marginTop: 10, marginBottom: 10},
   privacyPolicyText: {

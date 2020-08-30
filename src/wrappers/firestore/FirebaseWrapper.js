@@ -2,14 +2,15 @@ import storage from '@react-native-firebase/storage';
 import firebase from '@react-native-firebase/app';
 import firestore from '@react-native-firebase/firestore';
 import RNFetchBlob from 'rn-fetch-blob';
-import AsyncStorage from '@react-native-community/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import * as NotificationsController from '../services/LocalPushController';
+import * as NotificationsController from '../../services/LocalPushController';
 import {
   addPictureToCloud,
   deletePictureFromCloud,
   handleObtainingDownloadUrl,
-} from './CloudStorageWrapper';
+  deleteFolder,
+} from '../CloudStorageWrapper';
+import Database from '../sqlite/SqliteFasade';
 
 export const handleOfflineImages = async (userID) => {
   try {
@@ -23,7 +24,7 @@ export const handleOfflineImages = async (userID) => {
     unUploadedFavItemImages.get().then((querySnapshot) => {
       querySnapshot.forEach((docSnapshot) => {
         // Upload first
-        uploadOfflineImage(docSnapshot.data().picID).then((result) => {
+        uploadOfflineImage(docSnapshot.data().picID, userID).then((result) => {
           if (result) {
             // Change necessary db field to true (so we know it got uploaded)
             updateOfflineDatabaseField(docSnapshot.ref);
@@ -41,7 +42,7 @@ export const handleOfflineImages = async (userID) => {
     unUploadedImages.get().then((querySnapshot) => {
       querySnapshot.forEach((docSnapshot) => {
         // Upload first
-        uploadOfflineImage(docSnapshot.data().picID).then((result) => {
+        uploadOfflineImage(docSnapshot.data().picID, userID).then((result) => {
           if (result) {
             // Change necessary db field to true (so we know it got uploaded)
             updateOfflineDatabaseField(docSnapshot.ref);
@@ -54,11 +55,11 @@ export const handleOfflineImages = async (userID) => {
   }
 };
 
-const uploadOfflineImage = async (imgID) => {
+const uploadOfflineImage = async (imgID, userID) => {
   // Generate picture path
-  let picPath = `${RNFetchBlob.fs.dirs.CacheDir}/${imgID}`;
+  let picPath = `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${imgID}`;
   if (await checkIfFileIsCached(picPath)) {
-    let result = await addPictureToCloud(imgID, picPath);
+    let result = await addPictureToCloud(imgID, picPath, userID);
     return result;
   } else {
     return false;
@@ -81,7 +82,11 @@ export const checkIfFileIsCached = async (filePath) => {
  * @return: ID of most recently added meal from DB if was added within {30} minutes of current time,
  * otherwise return null
  */
-export async function getMostRecentMealIfApplicable(mealItemTime, userID) {
+export async function getMostRecentMealIfApplicable(
+  mealItemTime,
+  userID,
+  combineMeals,
+) {
   let id;
   let mostRecentMealQuery = firestore()
     .collection('users')
@@ -94,7 +99,7 @@ export async function getMostRecentMealIfApplicable(mealItemTime, userID) {
     if (
       querySnapshots.size == 0 ||
       querySnapshots.docs[0].get('mealStarted').seconds <
-        mealItemTime.seconds - 10 // TODO: let user specify this value in settings
+        mealItemTime.seconds - combineMeals * 60 //
     ) {
       id = null;
     } else {
@@ -105,33 +110,39 @@ export async function getMostRecentMealIfApplicable(mealItemTime, userID) {
   return id;
 }
 
-export const getMealItem = async (item, itemID, mealID, isNetOnline) => {
+export const getMealItemImgUri = async (userID, picID) => {
+  let returnPicPath = '';
+
+  let picPath = `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${picID}`;
+  let doesExist = await checkIfFileIsCached(picPath);
+
+  if (!doesExist) {
+    // get the download link
+    let url = await handleObtainingDownloadUrl(picID, userID);
+
+    // Download file to cache folder
+    await RNFetchBlob.config({path: picPath}).fetch('GET', url);
+    console.log('Downloaded img!');
+  }
+
+  returnPicPath = `file://${picPath}`;
+
+  return returnPicPath;
+};
+
+export const getMealItem = async (
+  item,
+  itemID,
+  mealID,
+  isNetOnline,
+  userID,
+) => {
   try {
     item.itemID = itemID;
     item.mealID = mealID;
-    // Add necessary item data to AsyncStorage: timeCreated (milliseconds) - picID
-    AsyncStorage.setItem(
-      item.timeStamp.toDate().getTime().toString(),
-      item.picID,
-    );
     // Generate picture path
-    let picPath = `${RNFetchBlob.fs.dirs.CacheDir}/${item.picID}`;
-    let doesExist = await checkIfFileIsCached(picPath);
-    if (doesExist) {
-      // Load from Cache
-      item.picPath = `file://${picPath}`;
-    } else {
-      // check if internet connection is working currently
-      if (isNetOnline) {
-        // get the download link
-        let url = await handleObtainingDownloadUrl(item.picID);
+    item.picPath = await getMealItemImgUri(userID, item.picID);
 
-        // Download file to cache folder
-        await RNFetchBlob.config({path: picPath}).fetch('GET', url);
-        item.picPath = `file://${picPath}`;
-        console.log('Downloaded!');
-      }
-    }
     return item;
   } catch (e) {
     console.log(e);
@@ -140,42 +151,45 @@ export const getMealItem = async (item, itemID, mealID, isNetOnline) => {
   }
 };
 
-export const deleteMealItem = async (itemID, mealID, imgID, itemTime) => {
+export const deleteMealItem = async (
+  itemID,
+  mealID,
+  imgID,
+  itemTime,
+  userID,
+) => {
   try {
-    let currentUser = firebase.auth().currentUser.uid;
-
     let state = await NetInfo.fetch();
 
     // Delete from DB
     await firebase
       .firestore()
       .collection('users')
-      .doc(currentUser)
+      .doc(userID)
       .collection('meals')
       .doc(mealID)
       .collection('mealItems')
       .doc(itemID)
       .delete()
-      .then(() => console.log('Deleted!'));
+      .then(() => console.log('Deleted meal item!'));
 
-    let imgIDIsInUse = await checkIfFavMealPicInUse(currentUser, imgID);
+    let imgIDIsInUse = await checkIfFavMealPicInUse(userID, imgID);
 
     let deletedFromCloud = false;
     if (state.isConnected && state.isInternetReachable && !imgIDIsInUse) {
       // Delete from CloudStorage
       try {
-        deletedFromCloud = await deletePictureFromCloud(imgID);
+        deletedFromCloud = await deletePictureFromCloud(imgID, userID);
       } catch (e) {
         deletedFromCloud = false;
       }
     }
-    console.log('Deleted successfully? - ' + deletedFromCloud);
     if (!deletedFromCloud && !imgIDIsInUse) {
       // Add a doc to collection (items marked for cloud storage deletion)
       firebase
         .firestore()
         .collection('users')
-        .doc(currentUser)
+        .doc(userID)
         .collection('itemsToBeDeletedFromCloud')
         .add({
           picID: imgID,
@@ -185,25 +199,10 @@ export const deleteMealItem = async (itemID, mealID, imgID, itemTime) => {
     }
 
     if (!imgIDIsInUse) {
-      // Async storage before (JUST FOR TESTS)
-      console.log('Async storage before');
-      await AsyncStorage.getAllKeys((error, keys) => {
-        keys.forEach((key) => console.log(key));
-      });
-
-      // Delete from Async Storage
-      await AsyncStorage.removeItem(itemTime, (error) => {
-        if (error) {
-          console.log(error);
-        }
-      });
-      console.log('Async storage after');
-      await AsyncStorage.getAllKeys((error, keys) => {
-        keys.forEach((key) => console.log(key));
-      });
-
       // delete from cache
-      await RNFetchBlob.fs.unlink(`${RNFetchBlob.fs.dirs.CacheDir}/${imgID}`);
+      await RNFetchBlob.fs.unlink(
+        `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${imgID}`,
+      );
     }
   } catch (e) {
     console.log(e);
@@ -223,20 +222,24 @@ export const addNewMealItem = async (
   isNetOnline,
   reminders,
   wasAddedToFavorites,
+  combineMeals,
+  userSymptoms,
 ) => {
   // Check to see if internet is reachable
   if (isNetOnline && !wasAddedToFavorites) {
     // add pic to Cloud
-    addPictureToCloud(imgID, imgDir);
+    addPictureToCloud(imgID, imgDir, userID);
   }
 
   let mealItemTime = await firebase.firestore.Timestamp.now();
-  let userRef = firestore()
-    .collection('users')
-    .doc(firebase.auth().currentUser.uid);
+  let userRef = firestore().collection('users').doc(userID);
 
   // Determine if the meal item needs to be added as a New Meal or to an existing meal
-  let mealID = await getMostRecentMealIfApplicable(mealItemTime, userID);
+  let mealID = await getMostRecentMealIfApplicable(
+    mealItemTime,
+    userID,
+    combineMeals,
+  );
   let currentMealRef;
   if (mealID != null) {
     // existing
@@ -244,22 +247,19 @@ export const addNewMealItem = async (
   } else {
     // new meal
 
+    // increment count
+    firebase
+      .firestore()
+      .collection('users')
+      .doc(userID)
+      .update('mealNum', firebase.firestore.FieldValue.increment(1));
+
     // Schedule after-meal notifications
     NotificationsController.scheduleAfterMealReminders(userID, reminders);
 
     currentMealRef = userRef.collection('meals').doc();
     // Add the start time of the meal and symptoms
-    let mealData = {mealStarted: mealItemTime};
-
-    // TODO: add a listener and pass in these boys once
-    // Get all available symptoms
-    let userSymptomsSnapshot = await userRef
-      .collection('symptoms')
-      .doc('userSymptoms')
-      .get();
-
-    // get the array of symptoms
-    let userSymptoms = userSymptomsSnapshot.data().availableSymptoms;
+    let mealData = {mealStarted: mealItemTime, symptomNotes: ''};
 
     // Populate map with initial values
     let initSymptoms = {};
@@ -301,7 +301,7 @@ export const addToFavorites = async (
   let uploadedToCloud = false;
   if (isNetOnline && !wasFavoredAlready) {
     // If yes -> add pic to Cloud
-    uploadedToCloud = await addPictureToCloud(picID, imgDir);
+    uploadedToCloud = await addPictureToCloud(picID, imgDir, userID);
   }
 
   firebase
@@ -319,16 +319,15 @@ export const addToFavorites = async (
     .then(() => console.log('added to favorites'));
 };
 
-export const loadUncachedFavorites = async (favorites) => {
+export const loadUncachedFavorites = async (favorites, userID) => {
   favorites.forEach((item) => {
-    let itemPicPath = `${RNFetchBlob.fs.dirs.CacheDir}/${item.picID}`;
+    let itemPicPath = `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${item.picID}`;
     // check to see if it's cached
     checkIfFileIsCached(itemPicPath).then((result) => {
-      console.log('---------------------------', result);
       if (!result) {
         // load from Cloud
         // get the download link
-        handleObtainingDownloadUrl(item.picID).then((downloadURL) => {
+        handleObtainingDownloadUrl(item.picID, userID).then((downloadURL) => {
           // Download file to cache folder
           RNFetchBlob.config({path: itemPicPath}).fetch('GET', downloadURL);
         });
@@ -353,7 +352,6 @@ export const deleteFavMealItem = async (
   picID,
   isNetOnline,
 ) => {
-  console.log('hmm...');
   await firebase
     .firestore()
     .collection('users')
@@ -362,23 +360,16 @@ export const deleteFavMealItem = async (
     .doc(favItemID)
     .delete();
 
-  console.log('hmm...2');
-
-  // TODO: Check if the item is in use anywhere by picID
+  // Check if the item is in use anywhere by picID
   let isInUse = await checkIfFavMealPicInUse(userID, picID);
-
-  console.log(isInUse);
   if (!isInUse) {
     // good to delete from Cloud and Cache and ignoring AsyncStorage for now
-    console.log('not in use!');
     let deletedFromCloud = false;
     if (isNetOnline) {
       try {
-        deletedFromCloud = await deletePictureFromCloud(picID);
+        deletedFromCloud = await deletePictureFromCloud(picID, userID);
       } catch (e) {}
     }
-
-    console.log('deleted from cloud?:', deletedFromCloud);
 
     if (!deletedFromCloud) {
       // Add a doc to collection (items marked for cloud storage deletion)
@@ -397,15 +388,15 @@ export const deleteFavMealItem = async (
     // Plus not a very good design on my part
 
     // delete from cache
-    await RNFetchBlob.fs.unlink(`${RNFetchBlob.fs.dirs.CacheDir}/${picID}`);
+    await RNFetchBlob.fs.unlink(
+      `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${picID}`,
+    );
   }
 
   return isInUse;
 };
 
 const checkIfFavMealPicInUse: boolean = async (userID, picID) => {
-  console.log('here');
-
   let res = true;
   let queryItemsFromFavsSnapshot = await firebase
     .firestore()
@@ -428,7 +419,129 @@ const checkIfFavMealPicInUse: boolean = async (userID, picID) => {
       res = false;
     }
   }
-
-  console.log(res);
   return res;
+};
+
+export const updateSymptomNotes = async (userID, mealID, note) => {
+  firebase
+    .firestore()
+    .collection('users')
+    .doc(userID)
+    .collection('meals')
+    .doc(mealID)
+    .update({symptomNotes: note})
+    .then(() => console.log('Updated symptom note'));
+};
+
+export const fetchMealData = async (userID) => {
+  return new Promise((resolve) => {
+    firebase
+      .firestore()
+      .collection('users')
+      .doc(userID)
+      .get()
+      .then((userDoc) => {
+        // if not empty
+        if (userDoc.data) {
+          let mealCount = userDoc.data().mealNum;
+
+          Database.getAllMeals(userID).then((localMeals) => {
+            let localMealCount = localMeals.length;
+            if (localMealCount < mealCount) {
+              console.log('fetching from firebase');
+              // fetch
+              firebase
+                .firestore()
+                .collection('users')
+                .doc(userID)
+                .collection('meals')
+                .orderBy('mealStarted', 'desc')
+                .get()
+                .then((querySnapshot) => {
+                  console.log('meals fetched:', querySnapshot.docs.length);
+                  let fetchedMeals = querySnapshot.docs.map(
+                    (mealDocSnapshot) => {
+                      let meal = mealDocSnapshot.data();
+
+                      let mealStarted = meal.mealStarted.toDate().getTime();
+                      // fetch data and add to DB (expensive)
+                      Database.addNewMeal(
+                        userID,
+                        mealDocSnapshot.id,
+                        mealStarted,
+                        meal.symptomNotes,
+                        meal.mealSymptoms,
+                      );
+
+                      let fetchedMeal = {
+                        ...meal,
+                        mealStarted: mealStarted,
+                        id: mealDocSnapshot.id,
+                      };
+
+                      return fetchedMeal;
+                    },
+                  );
+
+                  resolve(fetchedMeals);
+                });
+            } else {
+              resolve(localMeals);
+            }
+          });
+        }
+      });
+  });
+  // if SQLite meal data is empty, make firestore query
+};
+
+export const deleteMealDB = async (userID, mealID) => {
+  // delete from SQLite
+  await Database.deleteMeal(userID, mealID);
+
+  // delete from Firestore
+  await firebase
+    .firestore()
+    .collection('users')
+    .doc(userID)
+    .collection('meals')
+    .doc(mealID)
+    .delete();
+
+  // decrement count
+  firebase
+    .firestore()
+    .collection('users')
+    .doc(userID)
+    .update('mealNum', firebase.firestore.FieldValue.increment(-1));
+};
+
+// delete user from DB, cloud storage
+export const deleteUser = async (userID) => {
+  // DB
+  await firebase.firestore().collection('users').doc(userID).delete();
+
+  deleteFolder(userID).then(() => {
+    console.log('deleted folder it!');
+  });
+};
+
+export const updateMostRecentMealsSymptoms = async (userID, symptomName) => {
+  let mostRecMealRef = firebase
+    .firestore()
+    .collection('users')
+    .doc(userID)
+    .collection('meals')
+    .orderBy('mealStarted', 'desc')
+    .limit(1);
+
+  let snapshot = await mostRecMealRef.get();
+  if (!snapshot.empty) {
+    let actualMealRef = snapshot.docs[0].ref;
+
+    let mealUpdate = {};
+    mealUpdate[`mealSymptoms.${symptomName}`] = 0;
+
+    await actualMealRef.update(mealUpdate);
+  }
 };

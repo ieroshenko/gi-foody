@@ -1,8 +1,6 @@
 import firebase from '@react-native-firebase/app';
-import {unscheduleReminder} from '../services/LocalPushController';
-import Database from '../Sqlite';
-
-const db = new Database();
+import {unscheduleReminder} from '../../services/LocalPushController';
+import Database from '../sqlite/SqliteFasade';
 
 export const addReminderToDB = async (
   isActive,
@@ -91,7 +89,7 @@ export const deleteReminderDB = async (userID, reminderID) => {
     .delete()
     .then(() => {
       unscheduleReminder(reminderID);
-      db.deleteReminder(reminderID).then(() => {
+      Database.deleteReminder(reminderID).then(() => {
         console.log('deleted a reminder');
       });
     });
@@ -99,5 +97,24 @@ export const deleteReminderDB = async (userID, reminderID) => {
 
 export const updateScheduledStatus = async (reminderID, isScheduled) => {
   // Update in sqlite
-  await db.updateReminder(reminderID, isScheduled);
+  await Database.updateReminder(reminderID, isScheduled);
+};
+
+export const deactivateAllActiveRems = async (userID) => {
+  let activeRemsRef = firebase
+    .firestore()
+    .collection('users')
+    .doc(userID)
+    .collection('reminders')
+    .where('isActive', '==', true);
+
+  activeRemsRef.get().then((querySnapshot) => {
+    let batch = firebase.firestore().batch();
+
+    querySnapshot.docs.forEach((reminderDoc) => {
+      batch.update(reminderDoc.ref, {isActive: false});
+    });
+
+    batch.commit().catch((err) => console.error(err));
+  });
 };
