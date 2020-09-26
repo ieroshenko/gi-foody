@@ -66,6 +66,7 @@ const LinkEmail = (props) => {
       .then((userCred) => {
         // Success
         props.updateLinkedStatus(true);
+        // TODO: implement email verification
       })
       .catch((e) => {
         setError(e.message);

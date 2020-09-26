@@ -1,3 +1,5 @@
+import MealObj from '../../entities/MealObj';
+
 export default class MealsSQLite {
   static async getAllMeals(userId, db) {
     const meals = [];
@@ -28,12 +30,11 @@ export default class MealsSQLite {
         symptomEntries[property] = value;
       }
 
-      let meal = {
-        id: mealId,
-        mealStarted: mealStarted,
-        symptomNotes: symptomNotes,
-        mealSymptoms: symptomEntries,
-      };
+      let meal = new MealObj.Builder(userId, mealId)
+        .withMealStarted(mealStarted)
+        .withSymptomNotes(symptomNotes)
+        .withMealSymptoms(symptomEntries)
+        .build();
 
       meals.push(meal);
     }
@@ -41,7 +42,7 @@ export default class MealsSQLite {
     return meals;
   }
 
-  static async addNewMeal(
+  static async addOrReplaceMeal(
     userId: string,
     mealId: string,
     mealStarted: number,
@@ -85,9 +86,8 @@ export default class MealsSQLite {
     userId: string,
     filterOptions: Array,
     orSelected: boolean,
-    db,
+    allMeals: Array<MealObj>,
   ) {
-    let allMeals = await this.getAllMeals(userId, db);
     let filteredMeals = allMeals.filter((meal) => {
       for (let i = 0; i < filterOptions.length; i++) {
         let option = filterOptions[i];
@@ -167,7 +167,7 @@ export default class MealsSQLite {
     return meal;
   }
 
-  static async deleteAllMeals(db) {
+  static async deleteAllMealData(db) {
     await db.executeQuery('DELETE FROM Meals');
     await db.executeQuery('DELETE FROM MealSymptoms');
   }

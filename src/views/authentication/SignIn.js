@@ -21,7 +21,7 @@ import appleAuth, {
   AppleAuthRequestScope,
   AppleButton,
 } from '@invertase/react-native-apple-authentication';
-import {createNewDBUser} from './SignUp';
+import {createNewDBUser} from '../../wrappers/firestore/UserFS';
 
 const SignInScreen = (props) => {
   const [email, setEmail] = useState('');
@@ -117,6 +117,7 @@ const SignInScreen = (props) => {
         if (props.anonUserId) {
           deleteUser(props.anonUserId);
         }
+        await createNewDBUser(response.user);
         setModalVisible(false);
       }
     } catch (e) {

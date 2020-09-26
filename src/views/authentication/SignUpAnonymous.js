@@ -3,7 +3,7 @@ import {Colors} from 'react-native/Libraries/NewAppScreen';
 import {LoginManager, AccessToken} from 'react-native-fbsdk';
 import auth, {firebase} from '@react-native-firebase/auth';
 import Modal from 'react-native-modal';
-import {createNewDBUser, sendEmailVerification} from './SignUp';
+import {sendEmailVerification} from '../../wrappers/firestore/UserFS';
 import {
   View,
   StyleSheet,

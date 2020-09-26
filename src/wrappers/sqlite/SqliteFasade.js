@@ -2,8 +2,8 @@ import SQLite from 'react-native-sqlite-storage';
 import MealsSQLite from './MealsSQLite';
 import SymptomsSQLite from './SymptomsSQLite';
 import RemindersSQLite from './RemindersSQLite';
-import awaitAsyncGenerator from '@babel/runtime/helpers/esm/awaitAsyncGenerator';
 import UsersSQLite from './UsersSQLite';
+import MealObj from '../../entities/MealObj';
 SQLite.DEBUG(false);
 SQLite.enablePromise(true);
 
@@ -33,15 +33,15 @@ export default class Database {
               'CREATE TABLE IF NOT EXISTS Reminders (reminderId, isScheduled, UNIQUE(reminderId))',
             );
             this.executeQuery(
+              'CREATE TABLE IF NOT EXISTS Users ' +
+                '(userId, isFirstTime, lastFetched BIGINT DEFAULT 0 NOT NULL, PRIMARY KEY(userId))',
+            );
+            this.executeQuery(
               'CREATE TABLE IF NOT EXISTS Meals (userId, mealId, mealStarted, symptomNotes, UNIQUE(mealId))',
             );
             this.executeQuery(
               'CREATE TABLE IF NOT EXISTS MealSymptoms (userId, mealId, property, value, PRIMARY KEY(userId, mealId, property))',
             );
-            this.executeQuery(
-              'CREATE TABLE IF NOT EXISTS Users (userId, isFirstTime, PRIMARY KEY(userId))',
-            );
-
             resolve();
           });
         })
@@ -109,14 +109,14 @@ export default class Database {
     return await MealsSQLite.getAllMeals(userId, this);
   }
 
-  static async addNewMeal(
+  static async addOrReplaceMeal(
     userId: string,
     mealId: string,
     mealStarted: number,
     symptomNotes: string,
     symptoms: Object,
   ) {
-    await MealsSQLite.addNewMeal(
+    await MealsSQLite.addOrReplaceMeal(
       userId,
       mealId,
       mealStarted,
@@ -131,17 +131,17 @@ export default class Database {
   }
 
   // N*M complexity
-  // It's an AND operator
   static async getFilteredMeals(
     userId: string,
     filterOptions: Array,
     orSelected: boolean,
+    meals: Array<MealObj>,
   ) {
     return await MealsSQLite.getFilteredMeals(
       userId,
       filterOptions,
       orSelected,
-      this,
+      meals,
     );
   }
 
@@ -150,9 +150,9 @@ export default class Database {
     return meal;
   }
 
-  // fcn for tests
-  static async deleteAllMeals() {
-    await MealsSQLite.deleteAllMeals(this);
+  // fcn needed in order to load fresh data from Server
+  static async deleteAllMealData() {
+    await MealsSQLite.deleteAllMealData(this);
   }
 
   ///////////////////////////////////////////////SYMPTOMS/////////////////////////////////////////////////////////
@@ -171,7 +171,7 @@ export default class Database {
     await SymptomsSQLite.updateSymptoms(userId, mealId, symptoms, this);
   }
 
-  // fcn for tests mostly
+  // fcn for tests
   static async getAllMealSymptoms(userId) {
     return await SymptomsSQLite.getAllMealSymptoms(userId, this);
   }
@@ -187,12 +187,16 @@ export default class Database {
     return await UsersSQLite.checkIfUserExists(userId, this);
   }
 
+  static async updateUserFirstTimeStatus(userId, newStatus) {
+    await UsersSQLite.updateUserFirstTimeStatus(userId, newStatus, this);
+  }
+
+  static async updateUserLastFetchedProp(userId: string, lastFetched: number) {
+    await UsersSQLite.updateUserLastFetchedProp(this, userId, lastFetched);
+  }
+
   //fcn for tests mostly
   static async getAllUsers() {
     return await UsersSQLite.getAllUsers(this);
-  }
-
-  static async updateUserFirstTimeStatus(userId, newStatus) {
-    await UsersSQLite.updateUserFirstTimeStatus(userId, newStatus, this);
   }
 }

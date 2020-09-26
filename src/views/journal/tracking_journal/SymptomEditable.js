@@ -4,6 +4,7 @@ import {sympColors} from '../../../constants/SymptomColors';
 import firebase from '@react-native-firebase/app';
 import {Platform, Text, View, StyleSheet} from 'react-native';
 import {Slider} from 'react-native-elements';
+import {updateSymptomValue} from '../../../wrappers/firestore/FirebaseWrapper';
 
 const SymptomEditable = (props) => {
   const userID = React.useContext(UserContext);
@@ -12,17 +13,7 @@ const SymptomEditable = (props) => {
   let color = sympColors.get(sympValue.toString());
 
   const updateDBValue = async () => {
-    let fieldMapToBeUpdated = {};
-    fieldMapToBeUpdated[`mealSymptoms.${sympID}`] = sympValue;
-
-    firebase
-      .firestore()
-      .collection('users')
-      .doc(userID)
-      .collection('meals')
-      .doc(props.mealID)
-      .update(fieldMapToBeUpdated)
-      .then(() => console.log('updated symptom value'));
+    updateSymptomValue(userID, props.mealID, sympID, sympValue);
 
     // Update parent component's value
     props.updateParentSymptom(sympID, sympValue);

@@ -101,7 +101,11 @@ export const ImagePreview = (props) => {
       isFavorited || fromFavorites,
       combineMeals,
       props.symptoms,
-    );
+    ).then((isNewMeal) => {
+      if (!isNewMeal) {
+        props.addMealItemToJournal();
+      }
+    });
 
     // Navigate to Eating Journal and scroll to top
     RootNavigation.navigate('Journal');

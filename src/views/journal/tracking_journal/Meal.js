@@ -3,6 +3,7 @@ import UserContext from '../../../hooks/UserContext';
 import NetInfoContext from '../../../hooks/NetInfoContext';
 import firebase from '@react-native-firebase/app';
 import {
+  deleteMealDB,
   getMealItem,
   updateSymptomNotes,
 } from '../../../wrappers/firestore/FirebaseWrapper';
@@ -37,29 +38,76 @@ const checkIfSymptomsAreShallowEqual = (msOld, msNew) => {
   return true;
 };
 
-const renderMealItem = ({item}) => {
-  let transformDeg = item.isAndroid ? '90deg' : '0deg';
+const RenderMealItem = (props) => {
+  const [downloadedImg, setDownloadedImg] = useState(false);
+
+  useEffect(() => {
+    props.item.handleImgDownload().then(() => setDownloadedImg(true));
+  }, [props.item]);
+
+  let transformDeg = props.item.isAndroid ? '90deg' : '0deg';
   return (
-    <Image
-      source={{uri: item.picPath}}
-      style={[
-        styles.mealItemImage,
-        {
-          transform: [{rotate: transformDeg}],
-        },
-      ]}
-    />
+    <>
+      {downloadedImg ? (
+        <Image
+          source={{uri: props.item.picPath}}
+          style={[
+            styles.mealItemImage,
+            {
+              transform: [{rotate: transformDeg}],
+            },
+          ]}
+        />
+      ) : (
+        <View style={styles.mealItemImage} />
+      )}
+    </>
   );
 };
 
 const Meal = React.memo(
   (props) => {
     const userID = React.useContext(UserContext);
-    let isNetOnline = React.useContext(NetInfoContext);
     const [symptomNotes, setSymptomNotes] = useState(props.item.symptomNotes);
-    const [mealItems, setMealItems] = useState([]);
+    const [mealItems, setMealItems] = useState(props.item.mealItems);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [mealSymptoms, setMealSymptoms] = useState([]);
+
+    const updateMealItemNote = (itemID, newNote) => {
+      let updatedItems = mealItems.map((mealItem) => {
+        if (mealItem.id === itemID) {
+          mealItem.notes = newNote;
+        }
+
+        return mealItem;
+      });
+
+      setMealItems(updatedItems);
+    };
+
+    const deleteMealItem = (itemID, mealID) => {
+      let updatedMealItems = mealItems.filter(
+        (item, index, array) => item.id !== itemID,
+      );
+      setMealItems(updatedMealItems);
+      if (updatedMealItems.length === 0) {
+        // Delete the meal completely
+        deleteMeal(mealID);
+        // Close the modal
+        setIsModalVisible(false);
+      }
+    };
+
+    const deleteMeal = async (mealID) => {
+      try {
+        // Delete from flatlist
+        props.deleteMeal(mealID);
+        // delete from DB
+        await deleteMealDB(userID, mealID);
+      } catch (e) {
+        console.log(e);
+      }
+    };
 
     useMemo(() => {
       setMealSymptoms(
@@ -68,19 +116,9 @@ const Meal = React.memo(
     }, [props.item.mealSymptoms]);
 
     useEffect(() => {
-      // Create the Firestore query to listen for the newest item
-      let unsubscribe = firebase
-        .firestore()
-        .collection('users')
-        .doc(userID)
-        .collection('meals')
-        .doc(props.item.id)
-        .collection('mealItems')
-        .orderBy('timeStamp', 'desc')
-        .onSnapshot((querySnapshot) => updateMealItems(querySnapshot));
-
-      return () => unsubscribe();
-    }, [isNetOnline, userID]);
+      // Load meal items
+      setMealItems(props.item.mealItems);
+    }, [props.item.mealItems]);
 
     const updateSymptom = (sympID, newSympValue) => {
       let updatedArray = mealSymptoms.map(([arraySympID, sympVal]) => {
@@ -90,40 +128,14 @@ const Meal = React.memo(
           return [arraySympID, sympVal];
         }
       });
-      // update SQLite
-      Database.updateSymptoms(userID, props.item.id, updatedArray);
       setMealSymptoms(updatedArray);
     };
 
     const updateSymptomNotesLocallyAndDB = () => {
-      let mealId = props.item.id;
+      let mealId = props.item.mealID;
       setSymptomNotes(symptomNotes);
       updateSymptomNotes(userID, mealId, symptomNotes);
       Database.updateSymptomNote(userID, mealId, symptomNotes);
-    };
-
-    /**
-     * Add a listener for all the meal items of the meal to display any changes (adding new meal items)
-     * @return {Promise<void>}
-     */
-    const updateMealItems = async (querySnapshot) => {
-      try {
-        Promise.all(
-          querySnapshot.docs.map((queryDocSnapshot) =>
-            getMealItem(
-              queryDocSnapshot.data(),
-              queryDocSnapshot.id,
-              props.item.id,
-              isNetOnline,
-              userID,
-            ),
-          ),
-        ).then((newData) => {
-          setMealItems(newData);
-        });
-      } catch (e) {
-        console.log(e);
-      }
     };
 
     const closeDetailScreen = () => {
@@ -139,9 +151,9 @@ const Meal = React.memo(
         <FlatList
           data={mealItems}
           // Item Key
-          keyExtractor={(item, index) => item.itemID}
+          keyExtractor={(item, index) => item.id}
           horizontal={true}
-          renderItem={renderMealItem}
+          renderItem={({item}) => <RenderMealItem item={item} />}
           style={styles.mealItemContainer}
           showsHorizontalScrollIndicator={false}
         />
@@ -166,12 +178,13 @@ const Meal = React.memo(
             meal={props.item}
             mealSymptoms={mealSymptoms}
             items={mealItems}
+            deleteMealItem={deleteMealItem}
             title={title}
-            deleteMeal={props.deleteMeal}
             updateParentSymptoms={updateSymptom}
             symptomNotes={symptomNotes}
             updateSymptomNotes={updateSymptomNotesLocallyAndDB}
             setNotes={(notes) => setSymptomNotes(notes)}
+            updateMealItemNote={updateMealItemNote}
           />
         </Modal>
       </View>
@@ -179,12 +192,16 @@ const Meal = React.memo(
   },
   (prevProps, nextProps) => {
     // check if meal symptoms are the same
-    // if equal, skipp update
-    let equal = checkIfSymptomsAreShallowEqual(
+    let equalSymp = checkIfSymptomsAreShallowEqual(
       prevProps.item.mealSymptoms,
       nextProps.item.mealSymptoms,
     );
-    return equal;
+
+    // check if meal items are the same
+    let equalItems =
+      prevProps.item.mealItems.length === nextProps.item.mealItems.length;
+
+    return equalSymp && equalItems;
   },
 );
 
@@ -248,6 +265,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginLeft: 10,
     marginRight: 10,
-    backgroundColor: 'white',
+    backgroundColor: '#e6e6e6',
   },
 });

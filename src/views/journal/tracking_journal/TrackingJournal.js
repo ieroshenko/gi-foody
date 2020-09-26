@@ -15,6 +15,7 @@ import {
 import RNFetchBlob from 'rn-fetch-blob';
 import UserContext from '../../../hooks/UserContext';
 import Database from '../../../wrappers/sqlite/SqliteFasade';
+import MealObj from '../../../entities/MealObj';
 
 /**
  * Function that deletes {10} images from cache if image cache size is bigger than {40} MB
@@ -83,7 +84,7 @@ const scanReducer = (state, [type, meals, lastVisible, mealID, userID]) => {
       let updatedMeals = state.documentData.slice();
       if (
         !state.documentData.some((element, index) => {
-          if (element.id === newMeal.id) {
+          if (element.mealID === newMeal.mealID) {
             updatedMeals[index] = newMeal;
             return true;
           } else {
@@ -112,7 +113,7 @@ const scanReducer = (state, [type, meals, lastVisible, mealID, userID]) => {
 
     case 'delete':
       let filteredData = state.documentData.filter(
-        (item) => item.id !== mealID,
+        (item) => item.mealID !== mealID,
       );
       let isEmpty = filteredData.length === 0 ? true : false;
 
@@ -124,6 +125,13 @@ const scanReducer = (state, [type, meals, lastVisible, mealID, userID]) => {
           : filteredData[filteredData.length - 1].mealStarted,
         isEmpty: isEmpty,
       };
+
+    case 'newItem':
+      // update the first item only
+      let docDataCopy = state.documentData.slice();
+      docDataCopy[0] = meals[0];
+
+      return {...state, documentData: docDataCopy};
   }
   return state;
 };
@@ -144,29 +152,41 @@ const ItemList = (props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
 
+  useEffect(() => {
+    if (state.documentData.length) {
+      // get meal items, then update flatlist
+      let firstMeal = state.documentData[0].cloneMeal();
+      firstMeal
+        .obtainMealItems()
+        .then(() => dispatch(['newItem', [firstMeal]]));
+    }
+  }, [props.newItemAdded]);
+
   const onRefresh = () => {
     setRefreshing(true);
     retrieveData(userID).then(() => setRefreshing(false));
   };
 
-  const processDocSnapshots = (docSnapshotArray) => {
-    let meals = docSnapshotArray.map((doc) => {
+  const processDocSnapshots: [] = async (docSnapshotArray) => {
+    let meals = [];
+    let mealDocArray = docSnapshotArray.docs;
+
+    for (let i = 0; i < mealDocArray.length; i++) {
+      let doc = mealDocArray[i];
       let newData = doc.data();
-      newData.id = doc.id;
+      let mealId = doc.id;
 
-      let mealStarted = newData.mealStarted.toDate().getTime();
+      // build meal
+      let meal = new MealObj.Builder(userID, mealId)
+        .withMealStarted(newData.mealStarted)
+        .withMealSymptoms(newData.mealSymptoms)
+        .withSymptomNotes(newData.symptomNotes)
+        .build();
 
-      // add to SQLite
-      Database.addNewMeal(
-        userID,
-        newData.id,
-        mealStarted,
-        newData.symptomNotes,
-        newData.mealSymptoms,
-      );
-
-      return newData;
-    });
+      // get meal items
+      await meal.obtainMealItems();
+      meals.push(meal);
+    }
 
     return meals;
   };
@@ -224,7 +244,7 @@ const ItemList = (props) => {
       // Make sure we found meals
       if (!documentSnapshots.empty) {
         // Get array of objects with document fields and refs to get mealItems later on
-        let initialDocData = processDocSnapshots(documentSnapshots.docs);
+        let initialDocData = await processDocSnapshots(documentSnapshots);
 
         // get the time stamp of the last visible document (Document timestamp To Start From For Proceeding Queries)
         let lastVisibleDoc =
@@ -251,22 +271,8 @@ const ItemList = (props) => {
    */
   const handleNewMeals = async (querySnapshot) => {
     try {
-      if (querySnapshot.size !== 0) {
-        let newDocRef = querySnapshot.docs[0];
-        let newData = newDocRef.data();
-        newData.id = newDocRef.id;
-        let newMealData = [newData];
-
-        let mealStarted = newData.mealStarted.toDate().getTime();
-
-        // add to SQLite
-        Database.addNewMeal(
-          userID,
-          newData.id,
-          mealStarted,
-          newData.symptomNotes,
-          newData.mealSymptoms,
-        );
+      if (!querySnapshot.empty) {
+        let newMealData = await processDocSnapshots(querySnapshot);
 
         dispatch(['new', newMealData, null, null, userID]);
         setLoading(false);
@@ -300,8 +306,8 @@ const ItemList = (props) => {
         let documentSnapshots = await additionalQuery.get();
         if (!documentSnapshots.empty) {
           // Get array of objects with document fields and refs to get mealItems later on
-          let additionalDocumentData = processDocSnapshots(
-            documentSnapshots.docs,
+          let additionalDocumentData = await processDocSnapshots(
+            documentSnapshots,
           );
 
           // Cloud Firestore: Last Visible Document (Document ID To Start From For Proceeding Queries)
@@ -354,7 +360,7 @@ const ItemList = (props) => {
         renderItem={renderMeal}
         ref={flatListRef}
         // Item Key
-        keyExtractor={(item, index) => String(item.id)}
+        keyExtractor={(item, index) => String(item.mealID)}
         // Footer (Activity Indicator)
         ListFooterComponent={renderFooter}
         // OnEndReached (function that is called when end is reached)

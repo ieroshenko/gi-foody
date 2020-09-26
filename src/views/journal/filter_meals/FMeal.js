@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {FlatList, Image, Text, View, StyleSheet} from 'react-native';
 import RenderMealItem from './RenderMealItem';
 import {getTitleDate, renderSymptom} from '../GlobalMealFunctions';
+import renderMealItem from './RenderMealItem';
 
 const FMeal = React.memo(
   (props) => {
@@ -21,9 +22,9 @@ const FMeal = React.memo(
         <FlatList
           data={mealItems}
           // Item Key
-          keyExtractor={(item, index) => item.itemID}
+          keyExtractor={(item, index) => item.id}
           horizontal={true}
-          renderItem={({item}) => <RenderMealItem {...item} />}
+          renderItem={({item}) => <RenderMealItem item={item} />}
           style={styles.mealItemContainer}
           showsHorizontalScrollIndicator={false}
           removeClippedSubviews={false}
@@ -57,7 +58,9 @@ const FMeal = React.memo(
       </View>
     );
   },
-  () => true,
+  (prevProps, nextProps) => {
+    return prevProps.item.mealItems.length === nextProps.item.mealItems.length;
+  },
 );
 
 export default FMeal;

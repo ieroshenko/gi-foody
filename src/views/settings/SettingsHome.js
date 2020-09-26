@@ -35,7 +35,10 @@ const SettingsHome = (props) => {
       .then(() => {
         RNFetchBlob.fs
           .mkdir(`${RNFetchBlob.fs.dirs.CacheDir}/ImgCache`)
-          .then(() => getImgCacheSize());
+          .then(() => {
+            getImgCacheSize();
+            Alert.alert('Got it!', 'Image cache was cleaned!');
+          });
       });
   };
 

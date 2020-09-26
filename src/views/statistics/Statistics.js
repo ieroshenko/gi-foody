@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
+import {Icon} from 'react-native-elements';
 import React, {useEffect, useState} from 'react';
 import {fetchMealData} from '../../wrappers/firestore/FirebaseWrapper';
 import UserContext from '../../hooks/UserContext';
@@ -17,11 +18,13 @@ import ScreenOrientation, {
   LANDSCAPE,
   LANDSCAPE_LEFT,
 } from 'react-native-orientation-locker/ScreenOrientation';
-import Orientation from 'react-native-orientation-locker';
-import {Icon} from 'react-native-elements';
-import * as RootNavigation from '../../hooks/RootNavigation';
+import RadioForm, {
+  RadioButton,
+  RadioButtonInput,
+  RadioButtonLabel,
+} from 'react-native-simple-radio-button';
 
-const dayRangeItems = [
+const DAY_RANGES = [
   {
     label: '30',
     value: 30,
@@ -74,7 +77,7 @@ const initSymptomsDayPotential = (trackedSymptoms) => {
   let sympsDayPotential = {};
 
   trackedSymptoms.forEach((symptom) => {
-    sympsDayPotential[symptom] = 0;
+    sympsDayPotential[symptom] = {value: 0, numLegitMeals: 0};
   });
 
   return sympsDayPotential;
@@ -93,102 +96,85 @@ const checkIfSameDay = (dayMSeconds, mealMSeconds) => {
   return ans;
 };
 
+const updateSymptomsDayPotential = (
+  symptomsDayPotential: Object,
+  mealSympValue: number,
+  symptom: string,
+) => {
+  symptomsDayPotential[symptom].value =
+    (symptomsDayPotential[symptom].value *
+      (symptomsDayPotential[symptom].numLegitMeals - 1) +
+      mealSympValue) /
+    symptomsDayPotential[symptom].numLegitMeals;
+};
+
 /**
  * Returns an array of Objects. Each object contains symptomName, array of corresponding data, and random rgba color
  * @param dayRange: day range selected by user (30, 60, 180, 0{∞})
  * @param meals: all meals
  * @param trackedSymptoms: symptoms that user is tracking
  */
-export const formatDataForDayRange = (dayRange, meals, trackedSymptoms) => {
+export const formatDataForDayRange = (
+  dayRange,
+  meals,
+  trackedSymptoms,
+  includeZeroValue: boolean = true,
+) => {
   let statsData = initStatsData(trackedSymptoms);
 
   // fcn updates statsData each day
   const updateStatsData = (symptomsDayPotential) => {
     statsData.forEach((dataSymptom) => {
       dataSymptom.statsData.unshift(
-        symptomsDayPotential[dataSymptom.symptomName],
+        symptomsDayPotential[dataSymptom.symptomName].value,
       );
     });
   };
 
   // get the beginning of current day (00:00)
   let mealIndex = 0;
-  // if day range is not ALL MEALS (indicated by zero)
-  if (dayRange !== 0) {
-    // get symptom potential for each day within day range
-    for (let i = 0; i < dayRange; i++) {
-      let numMealsThisDay = 0;
-      let symptomsDayPotential: Object = initSymptomsDayPotential(
-        trackedSymptoms,
-      );
 
-      let dayInMilliseconds = Date.now() - i * 86400000;
+  let iterationRange = dayRange === 0 ? 100000000000000 : dayRange;
+  for (let i = 0; i < iterationRange; i++) {
+    let symptomsDayPotential: Object = initSymptomsDayPotential(
+      trackedSymptoms,
+    );
 
-      for (mealIndex; mealIndex < meals.length; mealIndex++) {
-        numMealsThisDay++;
-        let currentMeal = meals[mealIndex];
+    let dayInMilliseconds = Date.now() - i * 86400000;
 
-        // check if it is within day in mSeconds
-        if (checkIfSameDay(dayInMilliseconds, currentMeal.mealStarted)) {
-          // iterate through tracked symptoms and update daily symptom potential
-          trackedSymptoms.forEach((symptom) => {
-            // make sure it exists in the meal
-            if (currentMeal.mealSymptoms[symptom] !== undefined) {
-              let mealSympValue = currentMeal.mealSymptoms[symptom];
-              symptomsDayPotential[symptom] =
-                (symptomsDayPotential[symptom] * (numMealsThisDay - 1) +
-                  mealSympValue) /
-                numMealsThisDay;
+    for (mealIndex; mealIndex < meals.length; mealIndex++) {
+      let currentMeal = meals[mealIndex];
+
+      // check if it is within day in mSeconds
+      if (checkIfSameDay(dayInMilliseconds, currentMeal.mealStarted)) {
+        // iterate through tracked symptoms and update daily symptom potential
+        trackedSymptoms.forEach((symptom) => {
+          // make sure it exists in the meal
+          if (currentMeal.mealSymptoms[symptom] !== undefined) {
+            let mealSympValue = currentMeal.mealSymptoms[symptom];
+
+            // check if we want to include this meal into data calculation
+            if (includeZeroValue || mealSympValue !== 0) {
+              symptomsDayPotential[symptom].numLegitMeals++;
+
+              updateSymptomsDayPotential(
+                symptomsDayPotential,
+                mealSympValue,
+                symptom,
+              );
             }
-          });
-        } else {
-          // probably already another day
-          break;
-        }
-      }
-
-      updateStatsData(symptomsDayPotential);
-    }
-  } else {
-    let i = 0;
-    while (true) {
-      let numMealsThisDay = 0;
-      let symptomsDayPotential: Object = initSymptomsDayPotential(
-        trackedSymptoms,
-      );
-
-      let dayInMilliseconds = Date.now() - i * 86400000;
-
-      for (mealIndex; mealIndex < meals.length; mealIndex++) {
-        numMealsThisDay++;
-        let currentMeal = meals[mealIndex];
-
-        // check if it is within day in mSeconds
-        if (checkIfSameDay(dayInMilliseconds, currentMeal.mealStarted)) {
-          // iterate through tracked symptoms and update daily symptom potential
-          trackedSymptoms.forEach((symptom) => {
-            // make sure it exists in the meal
-            if (currentMeal.mealSymptoms[symptom] !== undefined) {
-              let mealSympValue = currentMeal.mealSymptoms[symptom];
-              symptomsDayPotential[symptom] =
-                (symptomsDayPotential[symptom] * (numMealsThisDay - 1) +
-                  mealSympValue) /
-                numMealsThisDay;
-            }
-          });
-        } else {
-          // probably already another day
-          break;
-        }
-      }
-
-      updateStatsData(symptomsDayPotential);
-
-      i++;
-
-      if (mealIndex === meals.length) {
+          }
+        });
+      } else {
+        // probably already another day
         break;
       }
+    }
+
+    updateStatsData(symptomsDayPotential);
+
+    if (dayRange === 0 && mealIndex === meals.length) {
+      break;
     }
   }
 
@@ -204,6 +190,8 @@ const Statistics = (props) => {
   const [isLoading, setIsLoading] = useState(false);
   const [meals, setMeals] = useState([]);
   const [statsData, setStatsData] = useState([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [excludeZeroes, setExcludeZeroes] = useState(true);
 
   // fetch initial meal and statistics data
   useEffect(() => {
@@ -215,6 +203,7 @@ const Statistics = (props) => {
           dayRange,
           fetchedMeals,
           symptoms,
+          !excludeZeroes,
         );
         setStatsData(formattedDataForDisplay);
         setIsLoading(false);
@@ -229,10 +218,11 @@ const Statistics = (props) => {
       dayRange,
       meals,
       symptoms,
+      !excludeZeroes,
     );
     setStatsData(formattedDataForDisplay);
     setIsLoading(false);
-  }, [dayRange]);
+  }, [dayRange, excludeZeroes]);
 
   const changeChartsToDisplay = (symptomName) => {
     let updatedData = statsData.map((symDataItem) => {
@@ -246,24 +236,71 @@ const Statistics = (props) => {
   };
 
   return (
-    <SafeAreaView style={styles.body}>
-      <ScreenOrientation
-        orientation={props.orientation}
-        onDeviceChange={(orientation) => {
-          if (orientation === 'PORTRAIT') {
-            props.openOrCloseStats(false);
-          }
-        }}
-      />
-      <View style={styles.contentContainer}>
-        <View style={styles.statisticsContainer}>
-          {isLoading ? (
-            <ActivityIndicator style={{width: '30%'}} size="large" />
-          ) : (
-            statsData.length > 0 && <ChartsManager statsData={statsData} />
-          )}
+    <>
+      <SafeAreaView style={styles.body}>
+        <ScreenOrientation
+          orientation={props.orientation}
+          onDeviceChange={(orientation) => {
+            if (orientation === 'PORTRAIT') {
+              props.openOrCloseStats(false);
+            }
+          }}
+        />
+        <View style={styles.contentContainer}>
+          <View style={styles.statisticsContainer}>
+            {isLoading ? (
+              <ActivityIndicator style={{width: '30%'}} size="large" />
+            ) : (
+              statsData.length > 0 && <ChartsManager statsData={statsData} />
+            )}
+          </View>
+          <View style={styles.optionSelector}>
+            <TouchableOpacity onPress={() => setShowSettings(true)}>
+              <Icon name="settings" size={28} />
+            </TouchableOpacity>
+            <View style={{width: '80%'}}>
+              <FlatList
+                contentContainerStyle={{height: 35}}
+                style={{width: '100%'}}
+                data={statsData}
+                renderItem={({item}) => (
+                  <SymptomSelector
+                    symptomData={item}
+                    updateSelection={changeChartsToDisplay}
+                  />
+                )}
+                horizontal={true}
+                keyExtractor={(item, index) => item.symptomName}
+                showsHorizontalScrollIndicator={false}
+              />
+            </View>
+          </View>
         </View>
-        <View style={styles.optionSelector}>
+      </SafeAreaView>
+      {showSettings && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            height: '100%',
+            width: '50%',
+            backgroundColor: 'white',
+            padding: 50,
+          }}>
+          <Text style={styles.settingsLabel}>Settings</Text>
+          <View style={[styles.radioBtnContainer, styles.settingsOption]}>
+            <Text style={styles.radioLabel}>
+              Exclude 0-values from calculating daily symptom potential
+            </Text>
+            <TouchableOpacity
+              style={
+                excludeZeroes
+                  ? [styles.radioBtn, {backgroundColor: '#7d8aff'}]
+                  : styles.radioBtn
+              }
+              onPress={() => setExcludeZeroes(!excludeZeroes)}
+            />
+          </View>
           <View
             style={{
               flexDirection: 'row',
@@ -273,7 +310,7 @@ const Statistics = (props) => {
             }}>
             <Text style={styles.dayRangeTxt}>Day range</Text>
             <DropDownPicker
-              items={dayRangeItems}
+              items={DAY_RANGES}
               defaultValue={dayRange}
               containerStyle={styles.pickerContainer}
               itemStyle={styles.dayRangeItem}
@@ -289,27 +326,17 @@ const Statistics = (props) => {
                 }
               }}
               dropDownMaxHeight={200}
+              zIndex={5000}
             />
           </View>
-          <View style={{width: '70%'}}>
-            <FlatList
-              contentContainerStyle={{height: 35}}
-              style={{width: '100%'}}
-              data={statsData}
-              renderItem={({item}) => (
-                <SymptomSelector
-                  symptomData={item}
-                  updateSelection={changeChartsToDisplay}
-                />
-              )}
-              horizontal={true}
-              keyExtractor={(item, index) => item.symptomName}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => setShowSettings(false)}>
+            <Text style={styles.closeTxt}>Close</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      )}
+    </>
   );
 };
 
@@ -361,5 +388,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     color: '#000',
+    fontFamily: 'System',
+  },
+  settingsLabel: {
+    fontFamily: 'System',
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  radioBtn: {
+    height: 25,
+    width: 25,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#9da6fc',
+  },
+  radioBtnContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  radioLabel: {
+    width: '80%',
+    fontFamily: 'System',
+    fontSize: 16,
+  },
+  settingsOption: {
+    marginBottom: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    paddingTop: 5,
+    paddingBottom: 5,
+    borderColor: '#e8e8e8',
+  },
+  closeBtn: {
+    position: 'absolute',
+    alignSelf: 'center',
+    backgroundColor: '#7d8aff',
+    width: '50%',
+    height: 40,
+    bottom: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeTxt: {
+    fontFamily: 'System',
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
 });

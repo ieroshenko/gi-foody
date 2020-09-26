@@ -11,6 +11,8 @@ import {
   deleteFolder,
 } from '../CloudStorageWrapper';
 import Database from '../sqlite/SqliteFasade';
+import * as MealHandler from './MealFS';
+import MealItemObj from '../../entities/MealItemObj';
 
 export const handleOfflineImages = async (userID) => {
   try {
@@ -75,44 +77,7 @@ export const checkIfFileIsCached = async (filePath) => {
   return doesExist;
 };
 
-/**
- * Get ID of most recently added meal from DB or null
- *
- * @param current time stamp
- * @return: ID of most recently added meal from DB if was added within {30} minutes of current time,
- * otherwise return null
- */
-export async function getMostRecentMealIfApplicable(
-  mealItemTime,
-  userID,
-  combineMeals,
-) {
-  let id;
-  let mostRecentMealQuery = firestore()
-    .collection('users')
-    .doc(userID) // need to change with Auth
-    .collection('meals')
-    .orderBy('mealStarted', 'desc')
-    .limit(1);
-
-  await mostRecentMealQuery.get().then((querySnapshots) => {
-    if (
-      querySnapshots.size == 0 ||
-      querySnapshots.docs[0].get('mealStarted').seconds <
-        mealItemTime.seconds - combineMeals * 60 //
-    ) {
-      id = null;
-    } else {
-      id = querySnapshots.docs[0].id;
-    }
-  });
-
-  return id;
-}
-
 export const getMealItemImgUri = async (userID, picID) => {
-  let returnPicPath = '';
-
   let picPath = `${RNFetchBlob.fs.dirs.CacheDir}/ImgCache/${picID}`;
   let doesExist = await checkIfFileIsCached(picPath);
 
@@ -124,31 +89,48 @@ export const getMealItemImgUri = async (userID, picID) => {
     await RNFetchBlob.config({path: picPath}).fetch('GET', url);
     console.log('Downloaded img!');
   }
-
-  returnPicPath = `file://${picPath}`;
-
-  return returnPicPath;
 };
 
-export const getMealItem = async (
-  item,
-  itemID,
-  mealID,
-  isNetOnline,
-  userID,
-) => {
-  try {
-    item.itemID = itemID;
-    item.mealID = mealID;
-    // Generate picture path
-    item.picPath = await getMealItemImgUri(userID, item.picID);
+/**
+ * Get meal items corresponding given userId and mealID
+ * @param userId
+ * @param mealId
+ * @return {Promise<void>}
+ */
+export const getMealItems: [] = async (userId, mealId) => {
+  let mealItems = [];
 
-    return item;
-  } catch (e) {
-    console.log(e);
-    // Need to return the item to display at least white space
-    return item;
+  let mItemsSnapshot = await firebase
+    .firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('meals')
+    .doc(mealId)
+    .collection('mealItems')
+    .orderBy('timeStamp', 'desc')
+    .get();
+
+  if (!mItemsSnapshot.empty) {
+    mealItems = mItemsSnapshot.docs.map((mItemDoc) => {
+      // build the meal item with the id
+      let data = mItemDoc.data();
+
+      let mealItem = new MealItemObj.Builder(userId, mItemDoc.id, mealId)
+        .withPicID(data.picID)
+        .withNotes(data.notes)
+        .withTimeStamp(data.timeStamp)
+        .setFromFavorites(data.fromFavorites)
+        .setIsAndroid(data.isAndroid)
+        .setUploadedToCloud(data.uploadedToCloud)
+        .build();
+
+      //mealItem.handleImgDownload(); // handle async
+
+      return mealItem;
+    });
   }
+
+  return mealItems;
 };
 
 export const deleteMealItem = async (
@@ -213,7 +195,7 @@ export const deleteMealItem = async (
  * Add new meal item to DB. Either append it to existing Meal or create new meal item
  * based on the time elapsed from the creating of previous Meal
  */
-export const addNewMealItem = async (
+export const addNewMealItem: boolean = async (
   imgID,
   imgDir,
   isAndroid,
@@ -225,6 +207,8 @@ export const addNewMealItem = async (
   combineMeals,
   userSymptoms,
 ) => {
+  let isNewMeal = false;
+
   // Check to see if internet is reachable
   if (isNetOnline && !wasAddedToFavorites) {
     // add pic to Cloud
@@ -246,29 +230,12 @@ export const addNewMealItem = async (
     currentMealRef = userRef.collection('meals').doc(mealID);
   } else {
     // new meal
-
-    // increment count
-    firebase
-      .firestore()
-      .collection('users')
-      .doc(userID)
-      .update('mealNum', firebase.firestore.FieldValue.increment(1));
-
+    isNewMeal = true;
     // Schedule after-meal notifications
     NotificationsController.scheduleAfterMealReminders(userID, reminders);
 
     currentMealRef = userRef.collection('meals').doc();
-    // Add the start time of the meal and symptoms
-    let mealData = {mealStarted: mealItemTime, symptomNotes: ''};
-
-    // Populate map with initial values
-    let initSymptoms = {};
-
-    userSymptoms.forEach((symptom) => {
-      initSymptoms[symptom] = 0;
-    });
-    mealData.mealSymptoms = initSymptoms;
-    currentMealRef.set(mealData);
+    await addNewMeal(userID, currentMealRef, mealItemTime, userSymptoms);
   }
 
   // Add the new meal item
@@ -285,7 +252,7 @@ export const addNewMealItem = async (
     })
     .then(() => console.log('added new meal item!'));
 
-  return currentMealRef.id;
+  return isNewMeal;
 };
 
 export const addToFavorites = async (
@@ -422,100 +389,6 @@ const checkIfFavMealPicInUse: boolean = async (userID, picID) => {
   return res;
 };
 
-export const updateSymptomNotes = async (userID, mealID, note) => {
-  firebase
-    .firestore()
-    .collection('users')
-    .doc(userID)
-    .collection('meals')
-    .doc(mealID)
-    .update({symptomNotes: note})
-    .then(() => console.log('Updated symptom note'));
-};
-
-export const fetchMealData = async (userID) => {
-  return new Promise((resolve) => {
-    firebase
-      .firestore()
-      .collection('users')
-      .doc(userID)
-      .get()
-      .then((userDoc) => {
-        // if not empty
-        if (userDoc.data) {
-          let mealCount = userDoc.data().mealNum;
-
-          Database.getAllMeals(userID).then((localMeals) => {
-            let localMealCount = localMeals.length;
-            if (localMealCount < mealCount) {
-              console.log('fetching from firebase');
-              // fetch
-              firebase
-                .firestore()
-                .collection('users')
-                .doc(userID)
-                .collection('meals')
-                .orderBy('mealStarted', 'desc')
-                .get()
-                .then((querySnapshot) => {
-                  console.log('meals fetched:', querySnapshot.docs.length);
-                  let fetchedMeals = querySnapshot.docs.map(
-                    (mealDocSnapshot) => {
-                      let meal = mealDocSnapshot.data();
-
-                      let mealStarted = meal.mealStarted.toDate().getTime();
-                      // fetch data and add to DB (expensive)
-                      Database.addNewMeal(
-                        userID,
-                        mealDocSnapshot.id,
-                        mealStarted,
-                        meal.symptomNotes,
-                        meal.mealSymptoms,
-                      );
-
-                      let fetchedMeal = {
-                        ...meal,
-                        mealStarted: mealStarted,
-                        id: mealDocSnapshot.id,
-                      };
-
-                      return fetchedMeal;
-                    },
-                  );
-
-                  resolve(fetchedMeals);
-                });
-            } else {
-              resolve(localMeals);
-            }
-          });
-        }
-      });
-  });
-  // if SQLite meal data is empty, make firestore query
-};
-
-export const deleteMealDB = async (userID, mealID) => {
-  // delete from SQLite
-  await Database.deleteMeal(userID, mealID);
-
-  // delete from Firestore
-  await firebase
-    .firestore()
-    .collection('users')
-    .doc(userID)
-    .collection('meals')
-    .doc(mealID)
-    .delete();
-
-  // decrement count
-  firebase
-    .firestore()
-    .collection('users')
-    .doc(userID)
-    .update('mealNum', firebase.firestore.FieldValue.increment(-1));
-};
-
 // delete user from DB, cloud storage
 export const deleteUser = async (userID) => {
   // DB
@@ -526,22 +399,53 @@ export const deleteUser = async (userID) => {
   });
 };
 
+///////////////////////////////////////// MEALS FASADE //////////////////////////////////////////////
+
+const addNewMeal = async (userId, mealRef, mealItemTime, userSymptoms) => {
+  await MealHandler.addNewMeal(userId, mealRef, mealItemTime, userSymptoms);
+};
+
+export const updateSymptomNotes = async (userID, mealID, note) => {
+  await MealHandler.updateSymptomNotes(userID, mealID, note);
+};
+
+export const updateSymptomValue = async (userID, mealID, sympID, sympValue) => {
+  await MealHandler.updateSymptomValue(userID, mealID, sympID, sympValue);
+};
+
+/**
+ * Fcn to add a new symptom, once it is added from Profile view to the most recent meal in journal
+ * @param userID
+ * @param symptomName
+ * @return {Promise<void>}
+ */
 export const updateMostRecentMealsSymptoms = async (userID, symptomName) => {
-  let mostRecMealRef = firebase
-    .firestore()
-    .collection('users')
-    .doc(userID)
-    .collection('meals')
-    .orderBy('mealStarted', 'desc')
-    .limit(1);
+  await MealHandler.updateMostRecentMealsSymptoms(userID, symptomName);
+};
 
-  let snapshot = await mostRecMealRef.get();
-  if (!snapshot.empty) {
-    let actualMealRef = snapshot.docs[0].ref;
+export const deleteMealDB = async (userID, mealID) => {
+  await MealHandler.deleteMealDB(userID, mealID);
+};
 
-    let mealUpdate = {};
-    mealUpdate[`mealSymptoms.${symptomName}`] = 0;
+/**
+ * Get ID of most recently added meal from DB or null
+ *
+ * @param current time stamp
+ * @return: ID of most recently added meal from DB if was added within {30} minutes of current time,
+ * otherwise return null
+ */
+export const getMostRecentMealIfApplicable = async (
+  mealItemTime,
+  userID,
+  combineMeals,
+) => {
+  return await MealHandler.getMostRecentMealIfApplicable(
+    mealItemTime,
+    userID,
+    combineMeals,
+  );
+};
 
-    await actualMealRef.update(mealUpdate);
-  }
+export const fetchMealData = async (userID) => {
+  return await MealHandler.fetchMealData(userID);
 };

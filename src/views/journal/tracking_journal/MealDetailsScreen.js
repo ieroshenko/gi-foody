@@ -17,33 +17,6 @@ import SymptomEditable from './SymptomEditable';
 import {deleteMealDB} from '../../../wrappers/firestore/FirebaseWrapper';
 
 const MealDetails = (props) => {
-  const userID = React.useContext(UserContext);
-  const [mealItems, setMealItems] = useState(props.items);
-
-  const deleteMealItem = (itemID, mealID) => {
-    let updatedMealItems = mealItems.filter(
-      (item, index, array) => item.itemID !== itemID,
-    );
-    setMealItems(updatedMealItems);
-    if (updatedMealItems.length === 0) {
-      // Delete the meal completely
-      deleteMeal(mealID);
-      // Close the modal
-      props.close();
-    }
-  };
-
-  const deleteMeal = async (mealID) => {
-    try {
-      // Delete from flatlist
-      props.deleteMeal(mealID);
-      // delete from DB
-      await deleteMealDB(userID, mealID);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-
   return (
     <SafeAreaView style={{flex: 1, backgroundColor: 'white'}}>
       <View style={styles.container}>
@@ -61,9 +34,13 @@ const MealDetails = (props) => {
         <ScrollView style={styles.mainContent}>
           <FlatList
             contentContainerStyle={{flexGrow: 1, justifyContent: 'center'}}
-            data={mealItems}
+            data={props.items}
             renderItem={({item}) => (
-              <DetailedMealItem item={item} deleteMealItem={deleteMealItem} />
+              <DetailedMealItem
+                item={item}
+                updateItemNoteOnParent={props.updateMealItemNote}
+                deleteMealItem={props.deleteMealItem}
+              />
             )}
             keyExtractor={(item, index) => item.itemID}
             horizontal={true}
@@ -89,7 +66,7 @@ const MealDetails = (props) => {
                 renderItem={({item}) => (
                   <SymptomEditable
                     symptom={item}
-                    mealID={props.meal.id}
+                    mealID={props.meal.mealID}
                     updateParentSymptom={props.updateParentSymptoms}
                   />
                 )}

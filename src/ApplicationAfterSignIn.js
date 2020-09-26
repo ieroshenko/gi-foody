@@ -4,7 +4,7 @@ import {
   cancelNecessaryReminders,
   scheduleFixedReminders,
 } from './services/LocalPushController';
-import {firebase} from '@react-native-firebase/auth';
+import firebase from '@react-native-firebase/app';
 import RemindersHomeScreen from './views/reminders/RemindersController';
 import {createStackNavigator} from '@react-navigation/stack';
 import Database from './wrappers/sqlite/SqliteFasade';

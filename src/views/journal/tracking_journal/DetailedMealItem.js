@@ -16,21 +16,20 @@ import UserContext from '../../../hooks/UserContext';
 import NetInfoContext from '../../../hooks/NetInfoContext';
 
 const DetailedMealItem = (props) => {
-  const isNetOnline = React.useContext(NetInfoContext);
   const [note, setNote] = useState(props.item.notes);
   const [noteHeight, setNoteHeight] = useState(0);
   const [imgUri, setImgUri] = useState(null);
   const userID = React.useContext(UserContext);
 
   useEffect(() => {
-    getMealItemImgUri(
-      userID,
-      props.item.picID,
-      isNetOnline,
-    ).then((newPicPath) => setImgUri(newPicPath));
+    props.item.handleImgDownload().then(() => setImgUri(props.item.picPath));
   }, []);
 
-  const updateNotesInDatabase = async () => {
+  const updateNotes = async () => {
+    props.updateItemNoteOnParent(props.item.id, note);
+
+    console.log('here');
+
     await firebase
       .firestore()
       .collection('users')
@@ -38,12 +37,12 @@ const DetailedMealItem = (props) => {
       .collection('meals')
       .doc(props.item.mealID)
       .collection('mealItems')
-      .doc(props.item.itemID)
+      .doc(props.item.id)
       .update({notes: note});
   };
 
   const handleDelete = () => {
-    let theItemID = props.item.itemID;
+    let theItemID = props.item.id;
     let mealID = props.item.mealID;
     let imgID = props.item.picID;
     let itemTime = props.item.timeStamp.toDate().getTime().toString();
@@ -83,7 +82,7 @@ const DetailedMealItem = (props) => {
           setNoteHeight(event.nativeEvent.contentSize.height + 5);
         }}
         blurOnSubmit={true}
-        onBlur={() => updateNotesInDatabase()}
+        onBlur={updateNotes}
         placeholder="Note">
         {note}
       </TextInput>

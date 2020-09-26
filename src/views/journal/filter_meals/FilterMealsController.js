@@ -26,10 +26,18 @@ const FilterMealsController = (props) => {
   const [andOrOption, setAndOrOption] = useState('and');
   const [settings, setSettings] = useState([]);
   const [isValidRequest, setIsValidRequest] = useState(false);
+  const [meals, setMeals] = useState([]);
+  const [isEmpty, setIsEmpty] = useState(false);
 
   // fetch data from Firestore to SQLite if necessary
   useEffect(() => {
-    fetchMealData(userID);
+    fetchMealData(userID).then((allMeals) => {
+      if (allMeals.length) {
+        setMeals(allMeals);
+      } else {
+        setIsEmpty(true);
+      }
+    });
   }, [userID]);
 
   // Initialize filter settings
@@ -103,6 +111,8 @@ const FilterMealsController = (props) => {
               andOrOption={andOrOption}
               isValidRequest={isValidRequest}
               resetRequestStatus={() => setIsValidRequest(false)}
+              mealData={meals}
+              isDataEmpty={isEmpty}
             />
           )}
         </Stack.Screen>

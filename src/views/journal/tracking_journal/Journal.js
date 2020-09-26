@@ -22,9 +22,6 @@ const NotificationHeaderRight = (props) => {
       style={{
         marginRight: 15,
       }}>
-      {/*<TouchableOpacity onPress={() => props.openStatistics()}>*/}
-      {/*  <Icon name="insert-chart" />*/}
-      {/*</TouchableOpacity>*/}
       <TouchableOpacity onPress={() => props.openReminders()}>
         <Icon name="notifications" />
       </TouchableOpacity>
@@ -41,17 +38,12 @@ const Journal = (props) => {
     navigation.navigate('Main', {screen: 'filter'});
   };
 
-  // const openStats = (navigation) => {
-  //   navigation.navigate('Main', {screen: 'statistics'});
-  // };
-
   return (
     <View style={{flex: 1}}>
       <StatusBar barStyle="dark-content" />
       <Stack.Navigator>
         <Stack.Screen
           name="Journal"
-          component={ItemList}
           options={({navigation}) => ({
             title: '',
             headerRight: () => (
@@ -64,8 +56,9 @@ const Journal = (props) => {
                 openFilter={() => openFilterMeals(navigation)}
               />
             ),
-          })}
-        />
+          })}>
+          {() => <ItemList newItemAdded={props.newItemAdded} />}
+        </Stack.Screen>
       </Stack.Navigator>
     </View>
   );

@@ -1,7 +1,8 @@
 import React, {useState} from 'react';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 import auth, {firebase} from '@react-native-firebase/auth';
-import SignUpScreen, {createNewDBUser} from './SignUp';
+import SignUpScreen from './SignUp';
+import {createNewDBUser} from '../../wrappers/firestore/UserFS';
 import Modal from 'react-native-modal';
 import Logo from '../../../img/Logo.svg';
 import {
@@ -103,6 +104,7 @@ const style = StyleSheet.create({
     backgroundColor: Colors.white,
     paddingHorizontal: 26,
     flex: 1,
+    paddingBottom: 60,
   },
   introSectionContainer: {
     marginTop: 70,

@@ -43,9 +43,14 @@ const renderMeal = ({item}) => {
   return <FMeal item={item} />;
 };
 
+const getMealItems = async (mealsData) => {
+  for (let i = 0; i < mealsData.length; i++) {
+    await mealsData[i].obtainMealItems();
+  }
+};
+
 const FilterMeals = (props) => {
   const userID = React.useContext(UserContext);
-  let isNetOnline = React.useContext(NetInfoContext);
   const limit = 7;
   const [docState, dispatch] = useReducer(scanReducer, initialState);
   const [loading, setLoading] = useState(false);
@@ -54,48 +59,26 @@ const FilterMeals = (props) => {
 
   // if correct filter options were applied, load data
   useEffect(() => {
-    if (props.isValidRequest) {
-      retrieveData().then(() => {
-        setCanRetrieveMore(true);
-        props.resetRequestStatus();
-      });
-    }
-  }, [props.isValidRequest]);
+    const handleApplySearch = () => {
+      if (props.isValidRequest && !props.isDataEmpty) {
+        // make sure data was successfully fetched
+        if (props.mealData.length) {
+          retrieveData().then(() => {
+            setCanRetrieveMore(true);
+            props.resetRequestStatus();
+          });
+        } else {
+          // didn't fetch yet
+          setLoading(true);
+          // and wait until meal Data in props changes, thus the fcn will be called again with meal data if there is any
+        }
+      } else {
+        setLoading(false);
+      }
+    };
 
-  const handleObtainingMealItems = async (meals) => {
-    const mealsWithItems = [...meals];
-
-    // get corresponding meal items for each meal
-    for (let i = 0; i < meals.length; i++) {
-      let meal = meals[i];
-      let querySnapshot = await firebase
-        .firestore()
-        .collection('users')
-        .doc(userID)
-        .collection('meals')
-        .doc(meal.id)
-        .collection('mealItems')
-        .get();
-
-      // handle obtaining meal item image
-      let mealItems = await Promise.all(
-        querySnapshot.docs.map((queryDocSnapshot) =>
-          getMealItem(
-            queryDocSnapshot.data(),
-            queryDocSnapshot.id,
-            meal.id,
-            isNetOnline,
-            userID,
-          ),
-        ),
-      );
-
-      // add meal items to meal
-      mealsWithItems[i] = {...meal, mealItems: mealItems};
-    }
-
-    return mealsWithItems;
-  };
+    handleApplySearch();
+  }, [props.isValidRequest, props.mealData, props.isDataEmpty]);
 
   const retrieveData = async () => {
     try {
@@ -107,6 +90,7 @@ const FilterMeals = (props) => {
         userID,
         props.settings,
         orSelected,
+        props.mealData,
       );
 
       let mealsLength = allFilteredMeals.length;
@@ -117,9 +101,9 @@ const FilterMeals = (props) => {
         let lastVisIndex = mealsLength > limit ? limit : mealsLength;
         let mealsData = allFilteredMeals.slice(0, lastVisIndex);
 
-        let mealsWithItems = await handleObtainingMealItems(mealsData);
+        await getMealItems(mealsData);
 
-        dispatch(['initial', mealsWithItems, lastVisIndex]);
+        dispatch(['initial', mealsData, lastVisIndex]);
       }
 
       setLoading(false);
@@ -149,9 +133,9 @@ const FilterMeals = (props) => {
 
         if (additionalMeals.length) {
           // get corresponding meal items for each meal
-          let mealsWithItems = await handleObtainingMealItems(additionalMeals);
+          await getMealItems(additionalMeals);
 
-          dispatch(['additional', mealsWithItems, lastVisIndex]);
+          dispatch(['additional', additionalMeals, lastVisIndex]);
         }
 
         setLoading(false);
@@ -186,7 +170,7 @@ const FilterMeals = (props) => {
             data={docState.documentData}
             renderItem={renderMeal}
             // Item Key
-            keyExtractor={(item, index) => item.id}
+            keyExtractor={(item, index) => item.mealID}
             // Footer (Activity Indicator)
             ListFooterComponent={renderFooter}
             // OnEndReached (function that is called when end is reached)

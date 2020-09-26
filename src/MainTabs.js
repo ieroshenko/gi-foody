@@ -25,6 +25,12 @@ const EmptyModalScreen = () => {
 };
 
 const MainTabs = (props) => {
+  const [newItemAdded, setNewItemAdded] = useState(false); // needed to tell tracking journal to load new meal item
+
+  const addMealItemToJournal = () => {
+    setNewItemAdded(!newItemAdded);
+  };
+
   return (
     <bottomTab.Navigator
       initialRouteName="Journal"
@@ -34,9 +40,9 @@ const MainTabs = (props) => {
         options={{
           tabBarIcon: JournalIcon,
           tabBarLabel: 'Journal',
-        }}
-        component={Journal}
-      />
+        }}>
+        {() => <Journal newItemAdded={newItemAdded} />}
+      </bottomTab.Screen>
       <bottomTab.Screen
         name="Snap"
         component={EmptyModalScreen}
@@ -49,6 +55,7 @@ const MainTabs = (props) => {
               reminders={props.reminders}
               combineMeals={props.combineMeals}
               symptoms={props.symptoms}
+              addMealItemToJournal={addMealItemToJournal}
             />
           ),
         }}

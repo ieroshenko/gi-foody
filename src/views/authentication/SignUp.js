@@ -3,8 +3,10 @@ import {Colors} from 'react-native/Libraries/NewAppScreen';
 import {LoginManager, AccessToken} from 'react-native-fbsdk';
 import auth, {firebase} from '@react-native-firebase/auth';
 import Modal from 'react-native-modal';
-import firestore from '@react-native-firebase/firestore';
-import {addReminderToDB} from '../../wrappers/firestore/RemindersDBManagement';
+import {
+  createNewDBUser,
+  sendEmailVerification,
+} from '../../wrappers/firestore/UserFS';
 import appleAuth, {
   AppleAuthRequestScope,
   AppleAuthRequestOperation,
@@ -19,50 +21,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
-  TouchableOpacity,
 } from 'react-native';
-
-export const sendEmailVerification = () => {
-  let user = firebase.auth().currentUser;
-  user
-    .sendEmailVerification()
-    .then(() => console.log('Sent the email verification'))
-    .catch((e) => console.log(e.toString()));
-};
-
-// add a default reminder (30 minutes after meal)
-export const initReminders = (userID) => {
-  addReminderToDB(true, 'How do you feel?', '0:30', 'after', userID, []);
-};
-
-export const initSymptoms = async (userID) => {
-  await firebase
-    .firestore()
-    .collection('users')
-    .doc(userID)
-    .collection('symptoms')
-    .doc('userSymptoms')
-    .set({
-      availableSymptoms: ['Bloating', 'Pain', 'Irritation', 'Nausea'],
-    });
-};
-
-export const createNewDBUser = async (user) => {
-  // check if user was already initialized before
-  let userRef = firestore().collection('users').doc(user.uid);
-  let querySnapshot = await userRef.get();
-  // if not, initialize
-  if (!querySnapshot.exists) {
-    let initData = {
-      mealNum: 0,
-      combineMeals: 30,
-      accType: 'FREE',
-    };
-    await userRef.set(initData);
-    initReminders(user.uid);
-    initSymptoms(user.uid);
-  }
-};
 
 const SignUpScreen = (props) => {
   const [email, setEmail] = useState('');

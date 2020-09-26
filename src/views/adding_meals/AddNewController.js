@@ -41,6 +41,7 @@ export const CameraModalScreen = (props) => {
           reminders={props.reminders}
           combineMeals={props.combineMeals}
           symptoms={props.symptoms}
+          addNewMealItemToJournal={props.addMealItemToJournal}
         />
       </Modal>
     </View>

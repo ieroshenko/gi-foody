@@ -109,6 +109,7 @@ const AddNewHome = (props) => {
           reminders={props.reminders}
           combineMeals={props.combineMeals}
           symptoms={props.symptoms}
+          addMealItemToJournal={props.addNewMealItemToJournal}
         />
       </Modal>
     </>

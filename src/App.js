@@ -18,6 +18,7 @@ import ScreenOrientation, {
 } from 'react-native-orientation-locker/ScreenOrientation';
 import * as Sentry from '@sentry/react-native';
 import SplashScreen from 'react-native-splash-screen';
+import {TouchableOpacity, Text, View} from 'react-native';
 
 Sentry.init({
   dsn:
@@ -157,15 +158,18 @@ const App = (props) => {
       {/*    justifyContent: 'space-between',*/}
       {/*    marginTop: 60,*/}
       {/*  }}>*/}
-      {/*  <TouchableOpacity onPress={() => Database.getAllMeals(userID)}>*/}
-      {/*    <Text>Get all meals sqldb</Text>*/}
+      {/*  /!*<TouchableOpacity onPress={() => Database.getAllMeals(userID)}>*!/*/}
+      {/*  /!*  <Text>Get all meals sqldb</Text>*!/*/}
+      {/*  /!*</TouchableOpacity>*!/*/}
+      {/*  /!*  <TouchableOpacity onPress={() => Database.getAllMealSymptoms(userID)}>*!/*/}
+      {/*  /!*    <Text>Get all meal symps</Text>*!/*/}
+      {/*  /!*  </TouchableOpacity>*!/*/}
+      {/*  /!*<TouchableOpacity onPress={() => Database.deleteAllMealData()}>*!/*/}
+      {/*  /!*  <Text>Delete all meal related data</Text>*!/*/}
+      {/*  /!*</TouchableOpacity>*!/*/}
+      {/*  <TouchableOpacity onPress={() => Database.getAllUsers()}>*/}
+      {/*    <Text>Get all users</Text>*/}
       {/*  </TouchableOpacity>*/}
-      {/*  <TouchableOpacity onPress={() => Database.getAllMealSymptoms(userID)}>*/}
-      {/*    <Text>Get all meal symps</Text>*/}
-      {/*  </TouchableOpacity>*/}
-      {/*<TouchableOpacity onPress={() => Database.deleteAllMeals()}>*/}
-      {/*  <Text>Delete all meal related data</Text>*/}
-      {/*</TouchableOpacity>*/}
       {/*</View>*/}
       <ScreenOrientation orientation={PORTRAIT} />
       <UserContext.Provider value={userID}>

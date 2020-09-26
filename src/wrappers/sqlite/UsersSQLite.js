@@ -1,8 +1,8 @@
 export default class UsersSQLite {
   static async addNewUser(userId, db) {
     let results = await db.executeQuery(
-      'INSERT OR IGNORE INTO Users VALUES(?, ?)',
-      [userId, true],
+      'INSERT OR IGNORE INTO Users VALUES(?, ?, ?)',
+      [userId, true, 0],
     );
 
     return results;
@@ -22,6 +22,17 @@ export default class UsersSQLite {
     }
   }
 
+  static async updateUserLastFetchedProp(
+    db,
+    userId: string,
+    lastFetched: number,
+  ) {
+    await db.executeQuery('UPDATE Users SET lastFetched = ? WHERE userId = ?', [
+      lastFetched,
+      userId,
+    ]);
+  }
+
   //fcn for tests mostly
   static async getAllUsers(db) {
     let users = [];
@@ -31,10 +42,11 @@ export default class UsersSQLite {
     let len = results.rows.length;
     for (let i = 0; i < len; i++) {
       let row = results.rows.item(i);
-      const {userId, isFirstTime} = row;
+      const {userId, isFirstTime, lastFetched} = row;
       users.push({
         userId,
         isFirstTime,
+        lastFetched,
       });
     }
 
